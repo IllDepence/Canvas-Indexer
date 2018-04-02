@@ -1,0 +1,5 @@
+python-dateutil>=2.6.1
+Flask>=0.12
+Flask-SQLAlchemy>=2.3.2
+PyLD>=0.8.2
+requests>=2.18.4

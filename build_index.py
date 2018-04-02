@@ -1,6 +1,22 @@
+import json
 import requests
+from sqlalchemy import Column, String, UnicodeText, create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
 
+Base = declarative_base()
 AS_URL = 'http://localhost/JSONkeeper/as/collection.json'
+
+class TermEntry(Base):
+    __tablename__ = 'termentry'
+    term = Column(String(255), primary_key=True)
+    json_string = Column(UnicodeText())
+
+engine = create_engine('sqlite:///index.db')
+Base.metadata.create_all(engine)
+Base.metadata.bind = engine
+DBSession = sessionmaker(bind=engine)
+session = DBSession()
 
 def get_referenced(json_dict, attrib):
     if type(json_dict[attrib]) == str:
@@ -50,5 +66,17 @@ while True:
         break
     as_ocp = get_referenced(as_ocp, 'prev')
 
-import pprint
-pprint.pprint(index)
+for term, doc in index.items():
+    entry = session.query(TermEntry).filter(TermEntry.term == term).first()
+    if entry:
+        json_arr = json.loads(entry.json_string)
+        skip = [c['can'] for c in json_arr]
+        for can in doc:
+            if not can['can'] in skip:
+                json_arr.append(doc)
+        entry.json_string = json.dumps(json_arr)
+        session.commit()
+    else:
+        entry = TermEntry(term=term, json_string=json.dumps(doc))
+        session.add(entry)
+        session.commit()
