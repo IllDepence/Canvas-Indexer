@@ -22,30 +22,29 @@ while True:
     # TODO: compare endTime to last crawl time
     for item in as_ocp['orderedItems']:
         # if it's a Canvas create
-        if item['type'] == 'Create' and item['object']['@type'] == 'sc:Canvas':
-            # build doc and store in index under 'term'
-            doc = {}
-            can = get_referenced(item, 'object')
-            man = get_referenced(can, 'within')
-            # term and Canvas URI
-            term = ''
-            can_uri = ''
-            for md in can.get('metadata', []):
-                if md['label'] == 'subject':
-                    term = md['value']
-                if md['label'] == 'origin':
-                    can_uri = md['value']
-            doc['can'] = can_uri
-            # image URI
-            for seq in man.get('sequences', []):
-                for o_can in seq.get('canvases', []):
-                    if o_can['@id'] in can_uri:
-                        # ↓ not too hardcoded?
-                        img = o_can['images'][0]['resource']['@id']
-                        doc['img'] = img
-            if term not in index.keys():
-                index[term] = []
-            index[term].append(doc)
+        if item['type'] == 'Create' and \
+                item['object']['@type'] == 'cr:Curation':
+            cur = get_referenced(item, 'object')
+            for ran in cur.get('selections', []):
+                # Manifest is the same for all Canvases ahead, so get it now
+                man = get_referenced(ran, 'within')
+                for can in ran.get('members'):
+                    # build doc and store in index under 'term'
+                    doc = {}
+                    doc['can'] = can['@id']
+                    # image URI
+                    for seq in man.get('sequences', []):
+                        for o_can in seq.get('canvases', []):
+                            if o_can['@id'] in can['@id']:
+                                # ↓ not too hardcoded?
+                                img = o_can['images'][0]['resource']['@id']
+                                doc['img'] = img
+                    # terms
+                    for md in can.get('metadata', []):
+                        term = md['value']
+                        if term not in index.keys():
+                            index[term] = []
+                        index[term].append(doc)
 
     if not as_ocp.get('prev', False):
         break
