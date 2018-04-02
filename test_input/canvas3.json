@@ -1,0 +1,24 @@
+{
+    "@context": [
+        "http://iiif.io/api/presentation/2/context.json",
+        "http://codh.rois.ac.jp/iiif/curation/1/context.json"
+    ],
+    "@id": "https://manifests.britishart.yale.edu/canvas/ba-obj-1153-0008-pub#xywh=3238,3818,716,397",
+    "@type": "sc:Canvas",
+    "label": "after treatment, framed, recto",
+    "metadata": [
+        {
+            "label": "subject",
+            "value": "tools"
+        },
+        {
+            "label": "origin",
+            "value": "https://manifests.britishart.yale.edu/canvas/ba-obj-1153-0008-pub#xywh=3238,3818,716,397"
+        }
+    ],
+    "within": {
+        "@id": "https://manifests.britishart.yale.edu/manifest/1153",
+        "@type": "sc:Manifest",
+        "label": "Alfred Joseph Woolmer, 1805–1892, British, Interior of the British Institution (Old Master Exhibition, Summer 1832), 1833, Oil on canvas, Yale Center for British Art, B1981.25.694, Paintings and Sculpture"
+    }
+}
