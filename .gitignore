@@ -3,3 +3,4 @@ venv
 *.swp
 *.pyc
 __pycache__
+gunicorn_config.py

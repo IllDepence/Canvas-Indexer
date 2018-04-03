@@ -20,7 +20,7 @@ class CrawlLog(Base):
     __tablename__ = 'crawllog'
     log_id = Column(Integer(), autoincrement=True, primary_key=True)
     datetime = Column(DateTime(timezone=True), server_default=func.now())
-    new_entries = Column(Integer)
+    new_entries = Column(Integer())
 
 engine = create_engine('sqlite:///index.db')
 Base.metadata.create_all(engine)
