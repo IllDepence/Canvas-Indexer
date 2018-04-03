@@ -3,17 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!--<link rel="stylesheet" type="text/css" href="static/css/style.css">-->
-<style>
-</style>
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/style.css') }}">
+<script src="{{ url_for('static', filename='js/functions.js') }}"></script>
 </head>
 <body>
 
 <h2>PasteDesk</h2>
+<form action="/" method="POST">
+    <p>query: <input type="text" name="q"><p>
+</form>
 {% for can in canvases %}
-<img src="{{ can[1] }}" title="{{ can[0] }}">
+<img src="{{ can[1] }}" title="{{ can[0] }}" onClick="imgClick(this)">
 {% endfor %}
 </div>
+
+<form action="/build/" method="POST">
+    <p><strong>create Curation</strong><br>
+    title: <input type="text" name="q">
+    <input type="submit" onClick="" value="create"></p>
+</form>
 
 </body>
 </html>

@@ -16,21 +16,25 @@ def cutout_thumbnail(iiif_img_uri, iiif_canvas_uri):
     return thumb_uri
 
 
-@pd.route('/')
-def index(methods=['GET', 'POST']):
+@pd.route('/', methods=['GET', 'POST'])
+def index():
     """ Index page.
     """
 
-    if request.method == 'POST':
-        pass
+    # look for query
+    q = False
+    if request.method == 'POST' and request.form.get('q', False):
+        q = request.form.get('q')
 
+    # get index
     term_entries = TermEntry.query.all()
     index = {}
     for entry in term_entries:
         index[entry.term] = json.loads(entry.json_string)
-    docs = [x[0] for x in index.values()]
-    all_canvases = [(doc['can'], cutout_thumbnail(doc['img'], doc['can']))
-                    for doc in docs]
+    # select canvases
+    docs = [v[0] for k, v in index.items() if not q or k == q]
+    canvases = [(doc['can'], cutout_thumbnail(doc['img'], doc['can']))
+                for doc in docs]
 
-    return render_template('index.html', canvases=all_canvases)
+    return render_template('index.html', canvases=canvases)
 
