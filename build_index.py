@@ -10,6 +10,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 AS_URL = 'http://localhost/JSONkeeper/as/collection.json'
+DB_URI = 'sqlite:///pastedesk/index.db'
 
 class TermEntry(Base):
     __tablename__ = 'termentry'
@@ -22,7 +23,7 @@ class CrawlLog(Base):
     datetime = Column(DateTime(timezone=True), server_default=func.now())
     new_entries = Column(Integer())
 
-engine = create_engine('sqlite:///index.db')
+engine = create_engine(DB_URI)
 Base.metadata.create_all(engine)
 Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
