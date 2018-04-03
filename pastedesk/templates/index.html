@@ -9,8 +9,10 @@
 </head>
 <body>
 
-<h2>Foo</h2>
-<p>{{ status_msg|safe }}</p>
+<h2>PasteDesk</h2>
+{% for can in canvases %}
+<img src="{{ can[1] }}" title="{{ can[0] }}">
+{% endfor %}
 </div>
 
 </body>

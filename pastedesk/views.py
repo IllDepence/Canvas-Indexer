@@ -7,17 +7,30 @@ from pastedesk.models import db, TermEntry, CrawlLog
 pd = Blueprint('pd', __name__)
 
 
+def cutout_thumbnail(iiif_img_uri, iiif_canvas_uri):
+    can_uri_parts = iiif_canvas_uri.split('#xywh=')
+    fragment = 'full'
+    if len(can_uri_parts) == 2:
+        fragment = can_uri_parts[1]
+    thumb_uri = iiif_img_uri.replace('full/full', '{}/!300,300'.format(fragment))
+    return thumb_uri
+
+
 @pd.route('/')
-def index():
+def index(methods=['GET', 'POST']):
     """ Index page.
     """
+
+    if request.method == 'POST':
+        pass
 
     term_entries = TermEntry.query.all()
     index = {}
     for entry in term_entries:
         index[entry.term] = json.loads(entry.json_string)
-    all_canvases = [(doc['can'], doc['img']) for doc in [x[0] for x in index.values()]]
-    status_msg = '<br>'.join(['{}, {}'.format(c[0], c[1]) for c in all_canvases])
+    docs = [x[0] for x in index.values()]
+    all_canvases = [(doc['can'], cutout_thumbnail(doc['img'], doc['can']))
+                    for doc in docs]
 
-    return render_template('index.html', status_msg=status_msg)
+    return render_template('index.html', canvases=all_canvases)
 
