@@ -1,7 +1,11 @@
+import datetime
+import dateutil.parser
 import json
 import requests
-from sqlalchemy import Column, String, UnicodeText, create_engine
+from sqlalchemy import (Column, Integer, String, UnicodeText, DateTime,
+                        create_engine, desc)
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -11,6 +15,12 @@ class TermEntry(Base):
     __tablename__ = 'termentry'
     term = Column(String(255), primary_key=True)
     json_string = Column(UnicodeText())
+
+class CrawlLog(Base):
+    __tablename__ = 'crawllog'
+    log_id = Column(Integer(), autoincrement=True, primary_key=True)
+    datetime = Column(DateTime(timezone=True), server_default=func.now())
+    new_entries = Column(Integer)
 
 engine = create_engine('sqlite:///index.db')
 Base.metadata.create_all(engine)
@@ -32,13 +42,15 @@ resp = requests.get(AS_URL)
 as_oc = resp.json()
 as_ocp = get_referenced(as_oc, 'last')
 index = {}
+last_crawl = session.query(CrawlLog).order_by(desc(CrawlLog.log_id)).first()
 # for all AC pages
 while True:
     # for all AC items
-    # TODO: compare endTime to last crawl time
     for item in as_ocp['orderedItems']:
-        # if it's a Canvas create
-        if item['type'] == 'Create' and \
+        end_time = dateutil.parser.parse(item['endTime'])
+        # if we haven't seen it yet and it's a Curation create
+        if (not last_crawl or end_time > last_crawl.datetime) and \
+                item['type'] == 'Create' and \
                 item['object']['@type'] == 'cr:Curation':
             cur = get_referenced(item, 'object')
             for ran in cur.get('selections', []):
@@ -66,6 +78,8 @@ while True:
         break
     as_ocp = get_referenced(as_ocp, 'prev')
 
+# persist index entries
+new_entries = 0
 for term, doc in index.items():
     entry = session.query(TermEntry).filter(TermEntry.term == term).first()
     if entry:
@@ -74,9 +88,15 @@ for term, doc in index.items():
         for can in doc:
             if not can['can'] in skip:
                 json_arr.append(doc)
+                new_entries += 1
         entry.json_string = json.dumps(json_arr)
         session.commit()
     else:
         entry = TermEntry(term=term, json_string=json.dumps(doc))
         session.add(entry)
         session.commit()
+        new_entries += len(doc)
+# persist crawl log
+log = CrawlLog(new_entries=new_entries)
+session.add(log)
+session.commit()
