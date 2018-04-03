@@ -17,10 +17,11 @@
 {% endfor %}
 </div>
 
-<form action="/build/" method="POST">
+<form id="cur_form" action="/build/" method="POST" onSubmit="return postCuration()">
     <p><strong>create Curation</strong><br>
-    title: <input type="text" name="q">
-    <input type="submit" onClick="" value="create"></p>
+    title: <input id="cur_title" type="text" name="title">
+    <input id="cur_json" type="hidden" name="json">
+    <input type="submit" value="create"></p>
 </form>
 
 </body>

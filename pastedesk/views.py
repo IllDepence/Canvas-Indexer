@@ -38,3 +38,13 @@ def index():
 
     return render_template('index.html', canvases=canvases)
 
+@pd.route('/build/', methods=['POST'])
+def build():
+    """ Build a Curation.
+    """
+
+    lisd = json.loads(request.form.get('json'))
+    print(lisd)
+    # TODO use util/iiif.py to build creation, send to JSONkeeper, ???, profit
+
+    return redirect(url_for('pd.index'))
