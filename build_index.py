@@ -103,7 +103,7 @@ for term, doc in index.items():
         skip = [c['can'] for c in json_arr]
         for can in doc:
             if not can['can'] in skip:
-                json_arr.append(doc)
+                json_arr.extend(doc)
                 new_entries += 1
         entry.json_string = json.dumps(json_arr)
         session.commit()

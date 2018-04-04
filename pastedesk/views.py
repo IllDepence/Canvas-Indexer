@@ -33,8 +33,12 @@ def index():
     for entry in term_entries:
         index[entry.term] = json.loads(entry.json_string)
     # select canvases
-    # docs = [v[0] for k, v in index.items() if not q or k == q]  # old
-    docs = [v for k, v in index.items() if not q or k == q][0]
+    docs = []
+    for term, can_list in index.items():
+        if not q or term == q:
+            for doc in can_list:
+                if not doc in docs:
+                    docs.append(doc)
     canvases = [(doc['man'], doc['can'],
                  cutout_thumbnail(doc['img'], doc['can'])
                 )
