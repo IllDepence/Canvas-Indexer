@@ -8,7 +8,8 @@ function imgClick(node) {
     selected = document.querySelectorAll('img.selected');
     list = [];
     for (i=0; i<selected.length; i++) {
-        list.push(selected[i].title);
+        list.push({'man':selected[i].getAttribute('man'),
+                   'can':selected[i].getAttribute('can')});
     }
     sessionStorage.setItem('canvasList', JSON.stringify(list));
 }

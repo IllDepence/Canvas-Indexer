@@ -1,4 +1,5 @@
 import json
+import uuid
 from flask import (abort, Blueprint, current_app, redirect, request, jsonify,
                    Response, url_for, render_template)
 from util.iiif import Curation
@@ -32,8 +33,11 @@ def index():
     for entry in term_entries:
         index[entry.term] = json.loads(entry.json_string)
     # select canvases
-    docs = [v[0] for k, v in index.items() if not q or k == q]
-    canvases = [(doc['can'], cutout_thumbnail(doc['img'], doc['can']))
+    # docs = [v[0] for k, v in index.items() if not q or k == q]  # old
+    docs = [v for k, v in index.items() if not q or k == q][0]
+    canvases = [(doc['man'], doc['can'],
+                 cutout_thumbnail(doc['img'], doc['can'])
+                )
                 for doc in docs]
 
     return render_template('index.html', canvases=canvases)
@@ -43,8 +47,20 @@ def build():
     """ Build a Curation.
     """
 
-    lisd = json.loads(request.form.get('json'))
-    print(lisd)
-    # TODO use util/iiif.py to build creation, send to JSONkeeper, ???, profit
+    canvases = json.loads(request.form.get('json'))
+    label = request.form.get('title')
+    man_dict = {}
+    for can in canvases:
+        if not man_dict.get(can['man']):
+            man_dict[can['man']] = []
+        man_dict[can['man']].append(can['can'])
+
+    cur = Curation(str(uuid.uuid4()), label)
+    for within in man_dict.keys():
+        cans = []
+        for can in man_dict[within]:
+            cans.append(cur.create_canvas(can))
+        cur.add_and_fill_range(within, cans)
+    print(cur.get_json())
 
     return redirect(url_for('pd.index'))

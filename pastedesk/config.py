@@ -29,11 +29,13 @@ class Cfg():
         # later read from config file
         cfg = {}
         cfg['db_uri'] = 'sqlite:///index.db'
+        cfg['keeper_api_url'] = 'http://localhost:5000/api'
         return cfg
 
     def set_debug_config(self, id_rewrite, as_serve):
         cfg = {}
         cfg['db_uri'] = 'sqlite://'
+        cfg['keeper_api_url'] = 'http://localhost:5000/api'
         self.cfg = cfg
 
     def _parse_config(self, cp):
@@ -49,6 +51,8 @@ class Cfg():
         if 'environment' in cp.sections():
             if cp['environment'].get('db_uri'):
                 cfg['db_uri'] = cp['environment'].get('db_uri')
+            if cp['environment'].get('keeper_api_url'):
+                cfg['keeper_api_url'] = cp['environment'].get('keeper_api_url')
 
         if fails:
             fail = '\n'.join(fails)

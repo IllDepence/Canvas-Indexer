@@ -61,6 +61,7 @@ while True:
                     # build doc and store in index under 'term'
                     doc = {}
                     doc['can'] = can['@id']
+                    doc['man'] = man['@id']
                     # image URI
                     for seq in man.get('sequences', []):
                         for o_can in seq.get('canvases', []):
@@ -80,6 +81,20 @@ while True:
     as_ocp = get_referenced(as_ocp, 'prev')
 
 # persist index entries
+
+# offline testing
+# index = {'siberia':[
+#         {'can':'http://www.foo.com/canvas1',
+#          'img':'http://127.0.0.1:8000/lwl12_ava.jpg',
+#          'man':'http://www.foo.com/manifest1'},
+#         {'can':'http://www.foo.com/canvas1',
+#          'img':'http://127.0.0.1:8000/lwl12_ava.jpg',
+#          'man':'http://www.foo.com/manifest1'},
+#         {'can':'http://www.foo.com/canvas1',
+#          'img':'http://127.0.0.1:8000/lwl12_ava.jpg',
+#          'man':'http://www.foo.com/manifest1'}
+#         ]}
+
 new_entries = 0
 for term, doc in index.items():
     entry = session.query(TermEntry).filter(TermEntry.term == term).first()

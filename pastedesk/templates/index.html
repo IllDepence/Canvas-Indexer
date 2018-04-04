@@ -13,7 +13,7 @@
     <p>query: <input type="text" name="q"><p>
 </form>
 {% for can in canvases %}
-<img src="{{ can[1] }}" title="{{ can[0] }}" onClick="imgClick(this)">
+<img src="{{ can[2] }}" can="{{ can[1] }}" man="{{ can[0] }}" onClick="imgClick(this)">
 {% endfor %}
 </div>
 
