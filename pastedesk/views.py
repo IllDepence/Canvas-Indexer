@@ -1,5 +1,6 @@
 import json
 import uuid
+import requests
 from flask import (abort, Blueprint, current_app, redirect, request, jsonify,
                    Response, url_for, render_template)
 from util.iiif import Curation
@@ -65,6 +66,17 @@ def build():
         for can in man_dict[within]:
             cans.append(cur.create_canvas(can))
         cur.add_and_fill_range(within, cans)
-    print(cur.get_json())
+
+    headers = {'Accept': 'application/json',
+               'Content-Type': 'application/ld+json'}
+    resp = requests.post(current_app.cfg.keeper_api_url(),
+                         headers=headers,
+                         data=cur.get_json())
+
+    if resp.status_code == 201:
+        viewer_prefix = ('http://codh.rois.ac.jp/software/iiif-curation-viewer'
+                         '/demo/?curation=')
+        url = '{}{}'.format(viewer_prefix, resp.headers['Location'])
+        return redirect(url)
 
     return redirect(url_for('pd.index'))

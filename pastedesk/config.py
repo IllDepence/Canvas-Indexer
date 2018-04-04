@@ -25,6 +25,9 @@ class Cfg():
     def db_uri(self):
         return self.cfg['db_uri']
 
+    def keeper_api_url(self):
+        return self.cfg['keeper_api_url']
+
     def _get_default_config(self):
         # later read from config file
         cfg = {}
