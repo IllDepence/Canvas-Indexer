@@ -6,3 +6,18 @@ img.selected {
 border: solid 2px #f00;
 margin: 1px;
 }
+
+#head {
+width: 250px;
+margin: 0 auto;
+}
+
+#foot {
+width: 350px;
+margin: 0 auto;
+}
+
+#canvas-container {
+width: 80%;
+margin: 0 auto;
+}
