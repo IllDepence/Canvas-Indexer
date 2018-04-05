@@ -80,8 +80,6 @@ while True:
         break
     as_ocp = get_referenced(as_ocp, 'prev')
 
-# persist index entries
-
 # offline testing
 # index = {'siberia':[
 #         {'can':'http://www.foo.com/canvas1',
@@ -95,6 +93,7 @@ while True:
 #          'man':'http://www.foo.com/manifest1'}
 #         ]}
 
+# persist index entries
 new_entries = 0
 for term, doc in index.items():
     entry = session.query(TermEntry).filter(TermEntry.term == term).first()

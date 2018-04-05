@@ -8,16 +8,24 @@ margin: 1px;
 }
 
 #head {
-width: 250px;
+width: 500px;
 margin: 0 auto;
+text-align: center;
+padding-bottom: 25px;
 }
 
 #foot {
 width: 350px;
 margin: 0 auto;
+text-align: center;
+padding-top: 25px;
 }
 
 #canvas-container {
 width: 80%;
 margin: 0 auto;
+}
+
+hr {
+color: #ccc;
 }

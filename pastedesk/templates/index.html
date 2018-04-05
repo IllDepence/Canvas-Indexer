@@ -9,21 +9,23 @@
 <body>
 
 <div id="head">
-    <img src="/static/img/logo_250px.png">
+    <img src="/static/img/logo_500px.png">
     <form action="/" method="POST">
         <p>query: <input type="text" name="q"><p>
     </form>
 </div>
 
+<hr>
 <div id="canvas-container">
 {% for can in canvases %}
     <img src="{{ can[2] }}" can="{{ can[1] }}" man="{{ can[0] }}" onClick="imgClick(this)">
 {% endfor %}
 </div>
+<hr>
 
 <div id="foot">
     <form id="cur_form" action="/build/" method="POST" onSubmit="return postCuration()">
-        <p><strong>create Curation</strong><br>
+        <p><strong>create Curation</strong><br><br>
         title: <input id="cur_title" type="text" name="title">
         <input id="cur_json" type="hidden" name="json">
         <input type="submit" value="create"></p>
