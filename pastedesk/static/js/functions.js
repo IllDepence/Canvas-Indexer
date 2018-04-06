@@ -1,4 +1,18 @@
+function setSelects() {
+    // mark all Canvases saved in sessionStorage as selected
+    // this is called at the end of every page load
+    list_json = JSON.parse(sessionStorage.getItem('canvasList'));
+    if (list_json != null) {
+        for (i=0; i<list_json.length; i++) {
+            to_select = document.querySelector('img[can="'+list_json[i]['can']+'"]');
+            to_select.classList.add('selected');
+        }
+    }
+}
+
 function imgClick(node) {
+    // toggle selection of a Canvas
+    // (for each toggle the sessionStorage Canvas list is rebuilt)
     if (node.classList.contains('selected')) {
         node.classList.remove('selected');
     }
@@ -15,6 +29,7 @@ function imgClick(node) {
 }
 
 function postCuration() {
+    // validate form fields and submit form
     list_json = sessionStorage.getItem('canvasList');
     title = document.querySelector('#cur_title').value;
     if (list_json && title.length > 0) {
