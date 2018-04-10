@@ -9,15 +9,6 @@ from pastedesk.models import db, TermEntry, CrawlLog
 pd = Blueprint('pd', __name__)
 
 
-def cutout_thumbnail(iiif_img_uri, iiif_canvas_uri):
-    can_uri_parts = iiif_canvas_uri.split('#xywh=')
-    fragment = 'full'
-    if len(can_uri_parts) == 2:
-        fragment = can_uri_parts[1]
-    thumb_uri = iiif_img_uri.replace('full/full', '{}/!300,300'.format(fragment))
-    return thumb_uri
-
-
 @pd.route('/', methods=['GET', 'POST'])
 def index():
     """ Index page.
@@ -40,12 +31,40 @@ def index():
             for doc in can_list:
                 if not doc in docs:
                     docs.append(doc)
-    canvases = [(doc['man'], doc['can'],
-                 cutout_thumbnail(doc['img'], doc['can'])
-                )
+    canvases = [(doc['manifestUrl'], doc['canvasId'], doc['canvasThumbnail'])
                 for doc in docs]
 
     return render_template('index.html', canvases=canvases)
+
+@pd.route('/api', methods=['GET'])
+def api():
+
+    q = request.args.get('q', False)
+    if not q:
+        return abort(400, 'No query given.')
+    start = int(request.args.get('start', 0))
+    limit = int(request.args.get('limit', -1))
+
+    ret = {}
+    ret['query'] = q
+    ret['start'] = start
+
+    results = []
+    term_entry = TermEntry.query.filter_by(term=q).first()
+    if term_entry:
+        all_results = json.loads(term_entry.json_string)
+    results = all_results[start:]
+    if limit >= 0:
+        ret['limit'] = limit
+        if len(results) > limit:
+            results = results[0:limit]
+    else:
+        ret['limit'] = None
+
+    ret['total'] = len(all_results)
+    ret['results'] = results
+
+    return jsonify(ret)
 
 @pd.route('/build/', methods=['POST'])
 def build():
