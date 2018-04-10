@@ -1,13 +1,28 @@
 ![Canvas Indexer](logo_500px.png)
 
-Short explanation.
+A flask web application that crawls Activity Streams for IIIF Canvases and offers a search API.
 
-## Use
+## Setup
 
-* ...
+* create virtual environment: `$ python3 -m venv venv`
+* activate virtual environment: `$ source venv/bin/activate`
+* install requirements: `$ pip install -r requirements.txt`
+
+## Run
+
+    $ source venv/bin/activate
+    $ python3 run.py [debug]
+
+## API
+
+* path: `{base_url}/api`
+* arguments
+    * required: `q`
+    * optional: `start`, `limit`
+* example: `{base_url}/api?q=face&start=5&limit=10`
 
 - - -
 
 ## Logo
 The Canvas Indexer logo uses image content from [絵本花葛蘿](http://codh.rois.ac.jp/pmjt/book/200015291/) in the [日本古典籍データセット（国文研所蔵）](http://codh.rois.ac.jp/pmjt/book/) provided by the [Center for Open Data in the Humanities](http://codh.rois.ac.jp/), used under [CC-BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/).
-The Canvas Indexer logo is licensed under [CC-BY-SA 4.0](CC-BY-SA 4.0: http://creativecommons.org/licenses/by-sa/4.0/) by Tarek Saier.
+The Canvas Indexer logo is licensed under [CC-BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/) by Tarek Saier.
