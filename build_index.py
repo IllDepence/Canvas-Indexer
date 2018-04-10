@@ -8,10 +8,10 @@ from sqlalchemy import (Column, Integer, String, UnicodeText, DateTime,
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
+from pastedesk.config import Cfg
 
+cfg = Cfg()
 Base = declarative_base()
-AS_URL = 'http://localhost/JSONkeeper/as/collection.json'
-DB_URI = 'sqlite:///pastedesk/index.db'
 
 
 class TermEntry(Base):
@@ -26,7 +26,7 @@ class CrawlLog(Base):
     datetime = Column(DateTime(timezone=True), server_default=func.now())
     new_entries = Column(Integer())
 
-engine = create_engine(DB_URI)
+engine = create_engine(cfg.db_uri())
 Base.metadata.create_all(engine)
 Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
@@ -100,7 +100,7 @@ def thumbnail_url(img_uri, canvas_uri, width, height, compliance_lvl):
     return thumb_url
 
 
-resp = requests.get(AS_URL)
+resp = requests.get(cfg.as_sources()[0])  # TODO: support multiple sources
 as_oc = resp.json()
 as_ocp = get_referenced(as_oc, 'last')
 index = {}
@@ -178,9 +178,9 @@ for term, doc in index.items():
     entry = session.query(TermEntry).filter(TermEntry.term == term).first()
     if entry:
         json_arr = json.loads(entry.json_string, object_pairs_hook=OrderedDict)
-        skip = [c['can'] for c in json_arr]
+        skip = [c['canvasId']+c['fragment'] for c in json_arr]
         for can in doc:
-            if not can['can'] in skip:
+            if not can['canvasId']+can['fragment'] in skip:
                 json_arr.extend(doc)
                 new_entries += 1
         entry.json_string = json.dumps(json_arr)

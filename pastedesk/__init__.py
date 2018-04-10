@@ -13,7 +13,6 @@ def create_app(**kwargs):
         app.cfg = Cfg()
         if kwargs:
             app.testing = True
-            app.cfg.set_debug_config(**kwargs)
 
         app.config['SQLALCHEMY_DATABASE_URI'] = app.cfg.db_uri()
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False

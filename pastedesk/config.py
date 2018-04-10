@@ -25,21 +25,19 @@ class Cfg():
     def db_uri(self):
         return self.cfg['db_uri']
 
-    def keeper_api_url(self):
-        return self.cfg['keeper_api_url']
+    def curation_upload_url(self):
+        return self.cfg['curation_upload_url']
+
+    def as_sources(self):
+        return self.cfg['as_sources']
 
     def _get_default_config(self):
         # later read from config file
         cfg = {}
-        cfg['db_uri'] = 'sqlite:///index.db'
-        cfg['keeper_api_url'] = 'http://localhost:5000/api'
-        return cfg
-
-    def set_debug_config(self, id_rewrite, as_serve):
-        cfg = {}
         cfg['db_uri'] = 'sqlite://'
-        cfg['keeper_api_url'] = 'http://localhost:5000/api'
-        self.cfg = cfg
+        cfg['curation_upload_url'] = 'http://localhost:5000/api'
+        cfg['as_sources'] = []
+        return cfg
 
     def _parse_config(self, cp):
         """ Prase a configparser.ConfigParser instance and return
@@ -51,11 +49,18 @@ class Cfg():
         fails = []
 
         # Environment
-        if 'environment' in cp.sections():
-            if cp['environment'].get('db_uri'):
-                cfg['db_uri'] = cp['environment'].get('db_uri')
-            if cp['environment'].get('keeper_api_url'):
-                cfg['keeper_api_url'] = cp['environment'].get('keeper_api_url')
+        if 'shared' in cp.sections():
+            if cp['shared'].get('db_uri'):
+                cfg['db_uri'] = cp['shared'].get('db_uri')
+        if 'webapi' in cp.sections():
+            if cp['webapi'].get('curation_upload_url'):
+                cfg['curation_upload_url'] = cp['webapi'].get(
+                                                        'curation_upload_url')
+        if 'crawler' in cp.sections():
+            if cp['crawler'].get('as_sources'):
+                as_sources = cp['crawler'].get('as_sources')
+                cfg['as_sources'] = [s.strip() for s in as_sources.split(',')
+                                     if len(s) > 0]
 
         if fails:
             fail = '\n'.join(fails)

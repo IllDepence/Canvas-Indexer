@@ -96,7 +96,7 @@ def build():
 
     headers = {'Accept': 'application/json',
                'Content-Type': 'application/ld+json'}
-    resp = requests.post(current_app.cfg.keeper_api_url(),
+    resp = requests.post(current_app.cfg.curation_upload_url(),
                          headers=headers,
                          data=cur.get_json())
 
