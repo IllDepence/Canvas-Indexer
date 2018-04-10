@@ -32,7 +32,9 @@ def index():
             for doc in can_list:
                 if not doc in docs:
                     docs.append(doc)
-    canvases = [(doc['manifestUrl'], doc['canvasId'], doc['canvasThumbnail'])
+    canvases = [(doc['manifestUrl'],
+                 '{}#{}'.format(doc['canvasId'], doc['fragment']),
+                 doc['canvasThumbnail'])
                 for doc in docs]
 
     return render_template('index.html', canvases=canvases)
