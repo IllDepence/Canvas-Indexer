@@ -1,6 +1,7 @@
 import json
 import uuid
 import requests
+from collections import OrderedDict
 from flask import (abort, Blueprint, current_app, redirect, request, jsonify,
                    Response, url_for, render_template)
 from util.iiif import Curation
@@ -45,14 +46,18 @@ def api():
     start = int(request.args.get('start', 0))
     limit = int(request.args.get('limit', -1))
 
-    ret = {}
+    ret = OrderedDict()
     ret['query'] = q
-    ret['start'] = start
 
     results = []
     term_entry = TermEntry.query.filter_by(term=q).first()
     if term_entry:
-        all_results = json.loads(term_entry.json_string)
+        all_results = json.loads(term_entry.json_string,
+                                 object_pairs_hook=OrderedDict)
+    else:
+        all_results = []
+    ret['total'] = len(all_results)
+    ret['start'] = start
     results = all_results[start:]
     if limit >= 0:
         ret['limit'] = limit
@@ -61,10 +66,11 @@ def api():
     else:
         ret['limit'] = None
 
-    ret['total'] = len(all_results)
     ret['results'] = results
 
-    return jsonify(ret)
+    resp = Response(json.dumps(ret, indent=4))
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
 
 @pd.route('/build/', methods=['POST'])
 def build():
