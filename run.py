@@ -1,5 +1,5 @@
 import sys
-from pastedesk import create_app
+from canvasindexer import create_app
 
 app = create_app()
 

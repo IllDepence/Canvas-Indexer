@@ -5,7 +5,7 @@ from collections import OrderedDict
 from flask import (abort, Blueprint, current_app, redirect, request, jsonify,
                    Response, url_for, render_template)
 from util.iiif import Curation
-from pastedesk.models import db, TermEntry, CrawlLog
+from canvasindexer.models import db, TermEntry, CrawlLog
 
 pd = Blueprint('pd', __name__)
 

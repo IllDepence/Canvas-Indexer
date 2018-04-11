@@ -25,8 +25,8 @@ class Cfg():
     def db_uri(self):
         return self.cfg['db_uri']
 
-    def curation_upload_url(self):
-        return self.cfg['curation_upload_url']
+    # def curation_upload_url(self):
+    #     return self.cfg['curation_upload_url']
 
     def as_sources(self):
         return self.cfg['as_sources']
@@ -35,7 +35,7 @@ class Cfg():
         # later read from config file
         cfg = {}
         cfg['db_uri'] = 'sqlite://'
-        cfg['curation_upload_url'] = 'http://localhost:5000/api'
+        # cfg['curation_upload_url'] = 'http://localhost:5000/api'
         cfg['as_sources'] = []
         return cfg
 
@@ -52,10 +52,10 @@ class Cfg():
         if 'shared' in cp.sections():
             if cp['shared'].get('db_uri'):
                 cfg['db_uri'] = cp['shared'].get('db_uri')
-        if 'webapi' in cp.sections():
-            if cp['webapi'].get('curation_upload_url'):
-                cfg['curation_upload_url'] = cp['webapi'].get(
-                                                        'curation_upload_url')
+        # if 'webapi' in cp.sections():
+        #     if cp['webapi'].get('curation_upload_url'):
+        #         cfg['curation_upload_url'] = cp['webapi'].get(
+        #                                                'curation_upload_url')
         if 'crawler' in cp.sections():
             if cp['crawler'].get('as_sources'):
                 as_sources = cp['crawler'].get('as_sources')

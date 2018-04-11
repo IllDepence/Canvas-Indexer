@@ -8,7 +8,7 @@ from sqlalchemy import (Column, Integer, String, UnicodeText, DateTime,
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
-from pastedesk.config import Cfg
+from canvasindexer.config import Cfg
 
 cfg = Cfg()
 Base = declarative_base()
@@ -182,8 +182,8 @@ while True:
                     # TODO: mby get read and include man[_can] metadata
                     doc = build_canvas_doc(man, cur_can)
                     # terms
-                    # for md in cur_can.get('metadata', [{'value': 'face'}]):
-                    for md in cur_can.get('metadata', []):
+                    # for md in cur_can.get('metadata', []):
+                    for md in cur_can.get('metadata', [{'value': 'face'}]):
                         term = md['value']
                         if term not in index.keys():
                             index[term] = []

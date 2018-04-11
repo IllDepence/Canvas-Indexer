@@ -5,7 +5,7 @@
 """
 
 from flask import Flask
-from pastedesk.config import Cfg
+from canvasindexer.config import Cfg
 
 def create_app(**kwargs):
     app = Flask(__name__)
@@ -17,11 +17,11 @@ def create_app(**kwargs):
         app.config['SQLALCHEMY_DATABASE_URI'] = app.cfg.db_uri()
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-        from pastedesk.models import db
+        from canvasindexer.models import db
         db.init_app(app)
         db.create_all()
 
-        from pastedesk.views import pd
+        from canvasindexer.views import pd
         app.register_blueprint(pd)
 
         return app
