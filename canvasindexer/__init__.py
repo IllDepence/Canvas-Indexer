@@ -1,7 +1,7 @@
-""" PasteDesk
+""" Canvas Indexer
 
-    A flask web application for combining (pasting) pre cut IIIF Canvases into
-    Curations.
+    A flask web application that crawls Activity Streams for IIIF Canvases and
+    offers a search API.
 """
 
 from flask import Flask

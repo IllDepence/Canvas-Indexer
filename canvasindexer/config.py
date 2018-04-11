@@ -34,7 +34,7 @@ class Cfg():
     def _get_default_config(self):
         # later read from config file
         cfg = {}
-        cfg['db_uri'] = 'sqlite://'
+        cfg['db_uri'] = 'sqlite:////tmp/ci_tmp.db'
         # cfg['curation_upload_url'] = 'http://localhost:5000/api'
         cfg['as_sources'] = []
         return cfg

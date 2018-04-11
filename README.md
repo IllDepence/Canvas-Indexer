@@ -8,6 +8,13 @@ A flask web application that crawls Activity Streams for IIIF Canvases and offer
 * activate virtual environment: `$ source venv/bin/activate`
 * install requirements: `$ pip install -r requirements.txt`
 
+## Config
+
+section | key | default | explanation
+------- | --- | ------- | -----------
+shared | db\_uri | sqlite:////tmp/ci\_tmp.db | a [SQLAlchemy database URI](http://docs.sqlalchemy.org/en/latest/core/engines.html#database-urls)
+crawler | as\_sources | [] | comma seperated list of links to [Activity Streams](https://www.w3.org/TR/activitystreams-core/) in form of OrderedCollections
+
 ## Run
 
     $ source venv/bin/activate
