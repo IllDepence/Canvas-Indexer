@@ -80,7 +80,8 @@ def get_img_compliance_level(profile):
     return lvl
 
 
-def thumbnail_url(img_uri, canvas_uri, width, height, compliance_lvl):
+def thumbnail_url(img_uri, canvas_uri, width, height, compliance_lvl,
+                  canvas_dict):
     """ Create a URL for a thumbnail image.
     """
 
@@ -93,7 +94,12 @@ def thumbnail_url(img_uri, canvas_uri, width, height, compliance_lvl):
     elif compliance_lvl == 1:
         size = '{},'.format(width)  # 200,
     elif compliance_lvl == 0:
-        size = 'full'
+        if canvas_dict.get('thumbnail'):
+            # Special case that e.g. Getty uses. Example:
+            # https://data.getty.edu/museum/api/iiif/287186/manifest.json
+            return canvas_dict.get('thumbnail')
+        else:
+            size = 'full'
     else:
         size = '!{},{}'.format(width, height)  # compliance level unknown
     thumb_url = img_uri.replace('full/full', '{}/{}'.format(fragment, size))
@@ -125,7 +131,7 @@ while True:
                     doc['manifestLabel'] = man['label']
                     # image URI
                     for seq in man.get('sequences', []):
-                        page_local = 1
+                        canvas_index = 1
                         for o_can in seq.get('canvases', []):
                             if o_can['@id'] in can['@id']:
                                 # > canvas
@@ -141,8 +147,9 @@ while True:
                                 doc['canvas'] = info_url
                                 # > canvasId
                                 doc['canvasId'] = o_can['@id']
-                                # > canvasIndex
-                                doc['canvasIndex'] = None  # TODO
+                                # > canvasIndex (CODH Cursor API specific)
+                                doc['canvasCursorIndex'] = o_can.get(
+                                                        'cursorIndex', None)
                                 # > canvasLabel
                                 doc['canvasLabel'] = o_can['label']
                                 # > canvasThumbnail
@@ -151,18 +158,20 @@ while True:
                                 profile = info_dict.get('profile')
                                 comp_lvl = get_img_compliance_level(profile)
                                 doc['canvasThumbnail'] = thumbnail_url(
-                                    img_url, can['@id'], 200, 200, comp_lvl)
+                                    img_url, can['@id'], 200, 200, comp_lvl,
+                                    o_can)
                                 # > pageLocal
-                                doc['pageLocal'] = page_local
+                                doc['canvasIndex'] = canvas_index
                                 # > fragment
                                 url_parts = can['@id'].split('#')
                                 if len(url_parts) == 2:
                                     doc['fragment'] = url_parts[1]
                                 else:
                                     doc['fragment'] = ''
-                            page_local += 1
+                            canvas_index += 1
                     # terms
-                    for md in can.get('metadata', []):
+                    # for md in can.get('metadata', []):
+                    for md in can.get('metadata', [{'value':'face'}]):
                         term = md['value']
                         if term not in index.keys():
                             index[term] = []
