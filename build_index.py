@@ -106,7 +106,60 @@ def thumbnail_url(img_uri, canvas_uri, width, height, compliance_lvl,
     return thumb_url
 
 
-resp = requests.get(cfg.as_sources()[0])  # TODO: support multiple sources
+def build_canvas_doc(man, cur_can):
+    """ Given a manifest and canvas cutout dictionary, build a document
+        (OrderedDict) with all information necessary to display the cutout as
+        a search result.
+    """
+
+    doc = OrderedDict()
+    doc['manifestUrl'] = man['@id']
+    doc['manifestLabel'] = man['label']
+    for seq in man.get('sequences', []):
+        canvas_index = 1
+        for man_can in seq.get('canvases', []):
+            if man_can['@id'] in cur_can['@id']:
+                # > canvas
+                img_url = man_can['images'][0]['resource']['@id']
+                # ↑ not too hardcoded?
+                url_base = '/'.join(img_url.split('/')[0:-4])
+                # ↑ guarateed to be in format:
+                #   {scheme}://{server}{/prefix}/{identifier}/
+                #   {region}/{size}/{rotation}/{quality}.
+                #   {format}
+                #   so [0:-4] cuts off /{size}/...{format}
+                info_url = '{}/info.json'.format(url_base)
+                doc['canvas'] = info_url
+                # > canvasId
+                doc['canvasId'] = man_can['@id']
+                # > canvasIndex (CODH Cursor API specific)
+                doc['canvasCursorIndex'] = man_can.get('cursorIndex', None)
+                # > canvasLabel
+                doc['canvasLabel'] = man_can['label']
+                # > canvasThumbnail
+                resp = requests.get(info_url)
+                info_dict = resp.json()
+                profile = info_dict.get('profile')
+                comp_lvl = get_img_compliance_level(profile)
+                doc['canvasThumbnail'] = thumbnail_url(img_url, cur_can['@id'],
+                                                       200, 200, comp_lvl,
+                                                       man_can)
+                # > pageLocal
+                doc['canvasIndex'] = canvas_index
+                # > fragment
+                url_parts = cur_can['@id'].split('#')
+                if len(url_parts) == 2:
+                    doc['fragment'] = url_parts[1]
+                else:
+                    doc['fragment'] = ''
+            canvas_index += 1
+
+    return doc
+
+resp = requests.get(cfg.as_sources()[0])
+# ↑ TODO: support multiple sources
+#         need for one last_crawl
+#         date per source?
 as_oc = resp.json()
 as_ocp = get_referenced(as_oc, 'last')
 index = {}
@@ -124,54 +177,13 @@ while True:
             for ran in cur.get('selections', []):
                 # Manifest is the same for all Canvases ahead, so get it now
                 man = get_referenced(ran, 'within')
-                for can in ran.get('members'):
-                    # build doc and store in index under 'term'
-                    doc = OrderedDict()
-                    doc['manifestUrl'] = man['@id']
-                    doc['manifestLabel'] = man['label']
-                    # image URI
-                    for seq in man.get('sequences', []):
-                        canvas_index = 1
-                        for o_can in seq.get('canvases', []):
-                            if o_can['@id'] in can['@id']:
-                                # > canvas
-                                img_url = o_can['images'][0]['resource']['@id']
-                                # ↑ not too hardcoded?
-                                url_base = '/'.join(img_url.split('/')[0:-4])
-                                # ↑ guarateed to be in format:
-                                #   {scheme}://{server}{/prefix}/{identifier}/
-                                #   {region}/{size}/{rotation}/{quality}.
-                                #   {format}
-                                #   so [0:-4] cuts off /{size}/...{format}
-                                info_url = '{}/info.json'.format(url_base)
-                                doc['canvas'] = info_url
-                                # > canvasId
-                                doc['canvasId'] = o_can['@id']
-                                # > canvasIndex (CODH Cursor API specific)
-                                doc['canvasCursorIndex'] = o_can.get(
-                                                        'cursorIndex', None)
-                                # > canvasLabel
-                                doc['canvasLabel'] = o_can['label']
-                                # > canvasThumbnail
-                                resp = requests.get(info_url)
-                                info_dict = resp.json()
-                                profile = info_dict.get('profile')
-                                comp_lvl = get_img_compliance_level(profile)
-                                doc['canvasThumbnail'] = thumbnail_url(
-                                    img_url, can['@id'], 200, 200, comp_lvl,
-                                    o_can)
-                                # > pageLocal
-                                doc['canvasIndex'] = canvas_index
-                                # > fragment
-                                url_parts = can['@id'].split('#')
-                                if len(url_parts) == 2:
-                                    doc['fragment'] = url_parts[1]
-                                else:
-                                    doc['fragment'] = ''
-                            canvas_index += 1
+                for cur_can in ran.get('members'):
+                    # doc
+                    # TODO: mby get read and include man[_can] metadata
+                    doc = build_canvas_doc(man, cur_can)
                     # terms
-                    # for md in can.get('metadata', []):
-                    for md in can.get('metadata', [{'value':'face'}]):
+                    # for md in cur_can.get('metadata', [{'value': 'face'}]):
+                    for md in cur_can.get('metadata', []):
                         term = md['value']
                         if term not in index.keys():
                             index[term] = []

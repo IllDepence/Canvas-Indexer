@@ -23,8 +23,11 @@ def index():
     # get index
     term_entries = TermEntry.query.all()
     index = {}
+    num_docs = 0
     for entry in term_entries:
-        index[entry.term] = json.loads(entry.json_string)
+        doc_list = json.loads(entry.json_string)
+        index[entry.term] = doc_list
+        num_docs += len(doc_list)
     # select canvases
     docs = []
     for term, can_list in index.items():
@@ -37,7 +40,13 @@ def index():
                  doc['canvasThumbnail'])
                 for doc in docs]
 
-    return render_template('index.html', canvases=canvases)
+
+    status = ('&gt; Crawling canvas cutouts from: "{}".<br>&gt; Currently storing {} canva'
+              'ses associated with {} keywords.<br>&gt; Available keywords: "{}"'
+             ).format('", "'.join(current_app.cfg.as_sources()), num_docs,
+                      len(index), '", "'.join(term for term in index.keys()))
+
+    return render_template('index.html', canvases=canvases, status=status)
 
 @pd.route('/api', methods=['GET'])
 def api():
@@ -74,7 +83,7 @@ def api():
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
-@pd.route('/build/', methods=['POST'])
+# @pd.route('/build/', methods=['POST'])
 def build():
     """ Build a Curation.
     """

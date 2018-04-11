@@ -10,19 +10,23 @@
 
 <div id="head">
     <img src="/static/img/logo_500px.png">
+</div>
+
+<div id="canvas-container">
+    <p id="status">{{ status|safe }}</p>
+
+    <hr>
     <form action="/" method="POST">
         <p>query: <input type="text" name="q"><p>
     </form>
-</div>
-
-<hr>
-<div id="canvas-container">
 {% for can in canvases %}
-    <img src="{{ can[2] }}" can="{{ can[1] }}" man="{{ can[0] }}" onClick="imgClick(this)">
+    <img src="{{ can[2] }}" can="{{ can[1] }}" man="{{ can[0] }}">
+    <!-- <img src="{{ can[2] }}" can="{{ can[1] }}" man="{{ can[0] }}" onClick="imgClick(this)"> -->
 {% endfor %}
+    <hr>
 </div>
-<hr>
 
+<!--
 <div id="foot">
     <form id="cur_form" action="/build/" method="POST" onSubmit="return postCuration()">
         <p><strong>create Curation</strong><br><br>
@@ -33,5 +37,6 @@
 </div>
 
 <script>setSelects()</script>
+-->
 </body>
 </html>
