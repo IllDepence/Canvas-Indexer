@@ -3,9 +3,9 @@ import json
 import re
 import requests
 from collections import OrderedDict
-from sqlalchemy import (Column, Integer, String, UnicodeText, DateTime,
-                        create_engine, desc)
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import (Column, Table, Integer, ForeignKey, String,
+                        UnicodeText, DateTime, create_engine, desc)
+from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
 from canvasindexer.config import Cfg
@@ -14,17 +14,37 @@ cfg = Cfg()
 Base = declarative_base()
 
 
-class TermEntry(Base):
-    __tablename__ = 'termentry'
-    term = Column(String(255), primary_key=True)
+term_canvas_assoc = Table('term_canvas_assoc',
+                          Base.metadata,
+                          Column('term_id', Integer, ForeignKey('term.id')),
+                          Column('canvas_id', Integer, ForeignKey('canvas.id'))
+                         )
+
+
+class Term(Base):
+    __tablename__ = 'term'
+    id = Column(Integer, primary_key=True)
+    term = Column(String(255), unique=True)
+    canvases = relationship('Canvas',
+                            secondary=term_canvas_assoc,
+                            back_populates='terms')
+
+
+class Canvas(Base):
+    __tablename__ = 'canvas'
+    id = Column(Integer, primary_key=True)
+    canvas_uri = Column(String(2048), unique=True)
     json_string = Column(UnicodeText())
+    terms = relationship('Term',
+                         secondary=term_canvas_assoc,
+                         back_populates='canvases')
 
 
 class CrawlLog(Base):
     __tablename__ = 'crawllog'
     log_id = Column(Integer(), autoincrement=True, primary_key=True)
     datetime = Column(DateTime(timezone=True), server_default=func.now())
-    new_entries = Column(Integer())
+    new_canvases = Column(Integer())
 
 engine = create_engine(cfg.db_uri())
 Base.metadata.create_all(engine)
@@ -34,8 +54,9 @@ session = DBSession()
 
 
 def get_referenced(json_dict, attrib):
-    """ Get the value of an attribute in a dict that is just referenced by a
-        URI or an object with a URI as its id.
+    """ Get a value (of an attribute in a dict) that is not included in its
+        entirety but just just referenced by a URI or an object with a URI as
+        its id.
     """
 
     if type(json_dict[attrib]) == str:
@@ -49,7 +70,7 @@ def get_referenced(json_dict, attrib):
 
 
 def get_img_compliance_level(profile):
-    """ Try to figure out the IIIF Image Api compliance level given the
+    """ Try to figure out the IIIF Image API compliance level given the
         `profile` value from a info.json.
     """
 
@@ -132,7 +153,7 @@ def build_canvas_doc(man, cur_can):
                 doc['canvas'] = info_url
                 # > canvasId
                 doc['canvasId'] = man_can['@id']
-                # > canvasIndex (CODH Cursor API specific)
+                # > canvasCursorIndex (CODH Cursor API specific)
                 doc['canvasCursorIndex'] = man_can.get('cursorIndex', None)
                 # > canvasLabel
                 doc['canvasLabel'] = man_can['label']
@@ -144,7 +165,7 @@ def build_canvas_doc(man, cur_can):
                 doc['canvasThumbnail'] = thumbnail_url(img_url, cur_can['@id'],
                                                        200, 200, comp_lvl,
                                                        man_can)
-                # > pageLocal
+                # > canvasIndex
                 doc['canvasIndex'] = canvas_index
                 # > fragment
                 url_parts = cur_can['@id'].split('#')
@@ -194,24 +215,30 @@ while True:
     as_ocp = get_referenced(as_ocp, 'prev')
 
 # persist index entries
-new_entries = 0
-for term, doc in index.items():
-    entry = session.query(TermEntry).filter(TermEntry.term == term).first()
-    if entry:
-        json_arr = json.loads(entry.json_string, object_pairs_hook=OrderedDict)
-        skip = [c['canvasId']+c['fragment'] for c in json_arr]
-        for can in doc:
-            if not can['canvasId']+can['fragment'] in skip:
-                json_arr.extend(doc)
-                new_entries += 1
-        entry.json_string = json.dumps(json_arr)
+new_canvases = 0
+for term_str, canvases in index.items():
+    # check if the term already exists, if not create it
+    term = session.query(Term).filter(Term.term == term_str).first()
+    if not term:
+        term = Term(term=term_str)
+        session.add(term)
         session.commit()
-    else:
-        entry = TermEntry(term=term, json_string=json.dumps(doc))
-        session.add(entry)
+    # check if the canvas already exists (Canvas URI = ID + fragment)
+    # if so, add term relations if not present. maybe also check for
+    #     inconsistencies, new metadata, etc.?
+    # if not add it + term relations
+    for can_dict in canvases:
+        canvas_uri = can_dict['canvasId']+can_dict['fragment']
+        can = session.query(Canvas).filter(
+                                    Canvas.canvas_uri == canvas_uri).first()
+        if not can:
+            can = Canvas(canvas_uri=canvas_uri,
+                         json_string = json.dumps(can_dict))
+            new_canvases += 1
+        can.terms.append(term)
+        session.add(can)
         session.commit()
-        new_entries += len(doc)
 # persist crawl log
-log = CrawlLog(new_entries=new_entries)
+log = CrawlLog(new_canvases=new_canvases)
 session.add(log)
 session.commit()

@@ -5,7 +5,7 @@ from collections import OrderedDict
 from flask import (abort, Blueprint, current_app, redirect, request, jsonify,
                    Response, url_for, render_template)
 from util.iiif import Curation
-from canvasindexer.models import db, TermEntry, CrawlLog
+from canvasindexer.models import db, Term, Canvas
 
 pd = Blueprint('pd', __name__)
 
@@ -20,33 +20,31 @@ def index():
     if request.method == 'POST' and request.form.get('q', False):
         q = request.form.get('q')
 
-    # get index
-    term_entries = TermEntry.query.all()
-    index = {}
-    num_docs = 0
-    for entry in term_entries:
-        doc_list = json.loads(entry.json_string)
-        index[entry.term] = doc_list
-        num_docs += len(doc_list)
-    # select canvases
-    docs = []
-    for term, can_list in index.items():
-        if not q or term == q:
-            for doc in can_list:
-                if not doc in docs:
-                    docs.append(doc)
-    canvases = [(doc['manifestUrl'],
-                 '{}#{}'.format(doc['canvasId'], doc['fragment']),
-                 doc['canvasThumbnail'])
-                for doc in docs]
+    all_canvases = Canvas.query.all()
+    all_terms = Term.query.all()
+
+    if q:
+        canvases = Canvas.query.filter(Canvas.terms.any(term=q)).all()
+    else:
+        canvases = all_canvases
+
+    canvas_dicts = [json.loads(can.json_string) for can in canvases]
+    canvas_digests = [(can['manifestUrl'],
+                      '{}#{}'.format(can['canvasId'], can['fragment']),
+                      can['canvasThumbnail'])
+                      for can in canvas_dicts]
 
 
     status = ('&gt; Crawling canvas cutouts from: "{}".<br>&gt; Currently storing {} canva'
               'ses associated with {} keywords.<br>&gt; Available keywords: "{}"'
-             ).format('", "'.join(current_app.cfg.as_sources()), num_docs,
-                      len(index), '", "'.join(term for term in index.keys()))
+             ).format('", "'.join(current_app.cfg.as_sources()),
+                      len(all_canvases),
+                      len(all_terms),
+                      '", "'.join(term.term for term in all_terms)
+                     )
 
-    return render_template('index.html', canvases=canvases, status=status)
+    return render_template('index.html', canvases=canvas_digests,
+                           status=status)
 
 @pd.route('/api', methods=['GET'])
 def api():
@@ -61,10 +59,11 @@ def api():
     ret['query'] = q
 
     results = []
-    term_entry = TermEntry.query.filter_by(term=q).first()
-    if term_entry:
-        all_results = json.loads(term_entry.json_string,
-                                 object_pairs_hook=OrderedDict)
+    canvases = Canvas.query.filter(Canvas.terms.any(term=q)).all()
+    if canvases:
+        all_results = [json.loads(can.json_string,
+                                  object_pairs_hook=OrderedDict)
+                       for can in canvases]
     else:
         all_results = []
     ret['total'] = len(all_results)
