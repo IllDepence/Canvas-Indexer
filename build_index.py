@@ -14,20 +14,22 @@ cfg = Cfg()
 Base = declarative_base()
 
 
-term_canvas_assoc = Table('term_canvas_assoc',
-                          Base.metadata,
-                          Column('term_id', Integer, ForeignKey('term.id')),
-                          Column('canvas_id', Integer, ForeignKey('canvas.id'))
-                         )
+class TermCanvasAssoc(Base):
+    __tablename__ = 'term_canvas_assoc'
+    term_id = Column('term_id', Integer, ForeignKey('term.id'),
+                     primary_key=True)
+    canvas_id = Column('canvas_id', Integer, ForeignKey('canvas.id'),
+                       primary_key=True)
+    assoc_type = Column('assoc_type', String(255))
+    term = relationship('Term', back_populates='canvases')
+    canvas = relationship('Canvas', back_populates='terms')
 
 
 class Term(Base):
     __tablename__ = 'term'
     id = Column(Integer, primary_key=True)
     term = Column(String(255), unique=True)
-    canvases = relationship('Canvas',
-                            secondary=term_canvas_assoc,
-                            back_populates='terms')
+    canvases = relationship('TermCanvasAssoc', back_populates='term')
 
 
 class Canvas(Base):
@@ -35,9 +37,7 @@ class Canvas(Base):
     id = Column(Integer, primary_key=True)
     canvas_uri = Column(String(2048), unique=True)
     json_string = Column(UnicodeText())
-    terms = relationship('Term',
-                         secondary=term_canvas_assoc,
-                         back_populates='canvases')
+    terms = relationship('TermCanvasAssoc', back_populates='canvas')
 
 
 class CrawlLog(Base):
@@ -235,7 +235,12 @@ for term_str, canvases in index.items():
             can = Canvas(canvas_uri=canvas_uri,
                          json_string = json.dumps(can_dict))
             new_canvases += 1
-        can.terms.append(term)
+        # TODO: when available in the AS or otherwise, use assoc_type to
+        #       distinguish between e.g. human created and machine generated
+        #       term canvas association
+        assoc = TermCanvasAssoc(assoc_type='foo')
+        assoc.term = term
+        can.terms.append(assoc)
         session.add(can)
         session.commit()
 # persist crawl log
