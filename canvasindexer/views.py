@@ -52,19 +52,24 @@ def api():
     q = request.args.get('q', False)
     if not q:
         return abort(400, 'No query given.')
+    source = request.args.get('source', 'canvas')
     start = int(request.args.get('start', 0))
     limit = int(request.args.get('limit', -1))
 
     ret = OrderedDict()
     ret['query'] = q
+    ret['source'] = source
 
     results = []
-    canvases = Canvas.query.join('terms', 'term').filter(Term.term == q)
-    if canvases:
-        all_results = [json.loads(can.json_string,
-                                  object_pairs_hook=OrderedDict)
-                       for can in canvases]
-    else:
+    if source == 'canvas':
+        canvases = Canvas.query.join('terms', 'term').filter(Term.term == q)
+        if canvases:
+            all_results = [json.loads(can.json_string,
+                                      object_pairs_hook=OrderedDict)
+                           for can in canvases]
+        else:
+            all_results = []
+    elif source == 'curation':
         all_results = []
     ret['total'] = len(all_results)
     ret['start'] = start

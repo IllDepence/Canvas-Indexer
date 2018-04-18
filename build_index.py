@@ -14,6 +14,18 @@ cfg = Cfg()
 Base = declarative_base()
 
 
+class TermCurationAssoc(Base):
+    __tablename__ = 'term_curation_assoc'
+    term_id = Column('term_id', Integer, ForeignKey('term.id'),
+                     primary_key=True)
+    curation_id = Column('curation_id', Integer, ForeignKey('curation.id'),
+                         primary_key=True)
+    metadata_type = Column('metadata_type', String(255))
+    actor = Column('actor', String(255))
+    term = relationship('Term', back_populates='curations')
+    curation = relationship('Curation', back_populates='terms')
+
+
 class TermCanvasAssoc(Base):
     __tablename__ = 'term_canvas_assoc'
     term_id = Column('term_id', Integer, ForeignKey('term.id'),
@@ -31,6 +43,7 @@ class Term(Base):
     id = Column(Integer, primary_key=True)
     term = Column(String(255), unique=True)
     canvases = relationship('TermCanvasAssoc', back_populates='term')
+    curations = relationship('TermCurationAssoc', back_populates='term')
 
 
 class Canvas(Base):
@@ -39,6 +52,14 @@ class Canvas(Base):
     canvas_uri = Column(String(2048), unique=True)
     json_string = Column(UnicodeText())
     terms = relationship('TermCanvasAssoc', back_populates='canvas')
+
+
+class Curation(Base):
+    __tablename__ = 'curation'
+    id = Column(Integer, primary_key=True)
+    curation_uri = Column(String(2048), unique=True)
+    json_string = Column(UnicodeText())
+    terms = relationship('TermCurationAssoc', back_populates='curation')
 
 
 class CrawlLog(Base):
