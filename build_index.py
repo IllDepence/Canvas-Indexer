@@ -1,3 +1,4 @@
+import datetime
 import dateutil.parser
 import json
 import re
@@ -49,7 +50,7 @@ class Term(Base):
 class Canvas(Base):
     __tablename__ = 'canvas'
     id = Column(Integer, primary_key=True)
-    canvas_uri = Column(String(2048), unique=True)
+    canvas_uri = Column(String(2048), unique=True)  # ID + fragment
     json_string = Column(UnicodeText())
     terms = relationship('TermCanvasAssoc', back_populates='canvas')
 
@@ -57,9 +58,12 @@ class Canvas(Base):
 class Curation(Base):
     __tablename__ = 'curation'
     id = Column(Integer, primary_key=True)
-    curation_uri = Column(String(2048), unique=True)
+    curation_uri = Column(String(2048), unique=True)  # ID + term[1]
     json_string = Column(UnicodeText())
     terms = relationship('TermCurationAssoc', back_populates='curation')
+    # [1] the reason for storing each curation once per associated term is that
+    #     depending on the search term their representation as a search result
+    #     (e.g. thumbnail) is different
 
 
 class CrawlLog(Base):
@@ -212,7 +216,7 @@ def build_canvas_doc(man, cur_can):
 
     return doc
 
-def build_curation_doc(cur):
+def build_curation_doc(cur, activity, canvas_doc):
     """ Given a curation dictionary, build a document (OrderedDict) with all
         information necessary to display the cutout as a search result.
     """
@@ -220,7 +224,15 @@ def build_curation_doc(cur):
     doc = OrderedDict()
     doc['curationUrl'] = cur['@id']
     doc['curationLabel'] = cur['label']
-    # TODO: expand according to stub
+    doc['curationThumbnail'] = canvas_doc['canvasThumbnail']
+    num_canvases = 0
+    for ran in cur.get('selections', []):
+        num_canvases += len(ran.get('members', []))
+        num_canvases += len(ran.get('canvases', []))
+    doc['totalImages'] = num_canvases
+    # TODO: once implemented in JSONkeeper, use the activity's endtime in case
+    #       it's an Update Activity
+    doc['crawledAt'] = datetime.datetime.now().isoformat()
 
     return doc
 
@@ -236,14 +248,14 @@ last_crawl = session.query(CrawlLog).order_by(desc(CrawlLog.log_id)).first()
 # for all AC pages
 while True:
     # for all AC items
-    for item in as_ocp['orderedItems']:
-        end_time = dateutil.parser.parse(item['endTime'])
+    for activity in as_ocp['orderedItems']:
+        activity_end_time = dateutil.parser.parse(activity['endTime'])
         # if we haven't seen it yet and it's a Curation create
-        if (not last_crawl or end_time > last_crawl.datetime) and \
-                item['type'] == 'Create' and \
-                item['object']['@type'] == 'cr:Curation':
-            cur = get_referenced(item, 'object')
-            cur_doc = build_curation_doc(cur)
+        if (not last_crawl or activity_end_time > last_crawl.datetime) and \
+                activity['type'] == 'Create' and \
+                activity['object']['@type'] == 'cr:Curation':
+            cur = get_referenced(activity, 'object')
+            # TODO: build cur_docs for curation top level metadata
             for ran in cur.get('selections', []):
                 # Manifest is the same for all Canvases ahead, so get it now
                 man = get_referenced(ran, 'within')
@@ -251,9 +263,10 @@ while True:
                     # doc
                     # TODO: mby get read and include man[_can] metadata
                     canvas_doc = build_canvas_doc(man, cur_can)
+                    cur_doc = build_curation_doc(cur, activity, canvas_doc)
                     # terms
-                    # for md in cur_can.get('metadata', []):
-                    for md in cur_can.get('metadata', [{'value': 'face'}]):
+                    # for md in cur_can.get('metadata', [{'value': 'face'}]):
+                    for md in cur_can.get('metadata', []):
                         term = md['value']
                         # Canvas index
                         if term not in term_to_canvas_index.keys():
@@ -293,12 +306,50 @@ for term_str, assocs in term_to_canvas_index.items():
                                     Canvas.canvas_uri == canvas_uri).first()
         if not can:
             can = Canvas(canvas_uri=canvas_uri,
-                         json_string = json.dumps(can_dict))
+                         json_string=json.dumps(can_dict))
             new_canvases += 1
-        db_assoc = TermCanvasAssoc(metadata_type=assoc.typ, actor=assoc.act)
-        db_assoc.term = term
-        can.terms.append(db_assoc)
-        session.add(can)
+            session.add(can)
+            session.commit()
+        already_associated = session.query(TermCanvasAssoc).filter(
+                                        TermCanvasAssoc.canvas_id == can.id,
+                                        TermCanvasAssoc.term_id == term.id
+                                                                  ).first()
+        if not already_associated:
+            db_assoc = TermCanvasAssoc(term=term, canvas=can,
+                                       metadata_type=assoc.typ,
+                                       actor=assoc.act)
+            session.add(db_assoc)
+        session.commit()
+# persist term_to_curation_index entries
+for term_str, assocs in term_to_curation_index.items():
+    # check if the term already exists, if not create it
+    term = session.query(Term).filter(Term.term == term_str).first()
+    if not term:
+        term = Term(term=term_str)
+        session.add(term)
+        session.commit()
+    # check if the curation already exists
+    # if so, add term relations if not present.
+    # if not add it + term relations
+    for assoc in assocs:
+        cur_dict = assoc.doc
+        cur_uri = cur_dict['curationUrl']+term.term
+        cur = session.query(Curation).filter(
+                    Curation.curation_uri == cur_uri).first()
+        if not cur:
+            cur = Curation(curation_uri=cur_uri,
+                           json_string=json.dumps(cur_dict))
+            session.add(cur)
+            session.commit()
+        already_associated = session.query(TermCurationAssoc).filter(
+                                    TermCurationAssoc.curation_id == cur.id,
+                                    TermCurationAssoc.term_id == term.id
+                                                                  ).first()
+        if not already_associated:
+            db_assoc = TermCurationAssoc(term=term, curation=cur,
+                                         metadata_type=assoc.typ,
+                                         actor=assoc.act)
+            session.add(cur)
         session.commit()
 # persist crawl log
 log = CrawlLog(new_canvases=new_canvases)

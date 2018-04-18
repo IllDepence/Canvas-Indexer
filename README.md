@@ -22,11 +22,17 @@ crawler | as\_sources | [] | comma seperated list of links to [Activity Streams]
 
 ## API
 
-* path: `{base_url}/api`
-* arguments
-    * required: `q`
-    * optional: `start`, `limit`
-* example: `{base_url}/api?q=face&start=5&limit=10`
+path: `{base_url}/api`  
+arguments:
+
+arg | required | explanation
+--- | -------- | -----------
+q | yes | query
+start | no | 0 based index from which to start listing results from the list of all results<br>defaults to `0`
+limit | no | limit the number of results being returned<br>defaults to `null` meaning no limit
+source | no | set the type of search results to be returned to either `canvas` or `curation`<br>detaults to `canvas`
+
+example: `{base_url}/api?q=face&start=5&limit=10`
 
 - - -
 

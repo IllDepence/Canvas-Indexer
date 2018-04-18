@@ -4,8 +4,8 @@ import requests
 from collections import OrderedDict
 from flask import (abort, Blueprint, current_app, redirect, request, jsonify,
                    Response, url_for, render_template)
-from util.iiif import Curation
-from canvasindexer.models import db, Term, Canvas
+from util.iiif import Curation as CurationObj
+from canvasindexer.models import db, Term, Canvas, Curation
 
 pd = Blueprint('pd', __name__)
 
@@ -70,7 +70,13 @@ def api():
         else:
             all_results = []
     elif source == 'curation':
-        all_results = []
+        curations = Curation.query.join('terms', 'term').filter(Term.term == q)
+        if curations:
+            all_results = [json.loads(cur.json_string,
+                                      object_pairs_hook=OrderedDict)
+                           for cur in curations]
+        else:
+            all_results = []
     ret['total'] = len(all_results)
     ret['start'] = start
     results = all_results[start:]
@@ -100,7 +106,7 @@ def build():
             man_dict[can['man']] = []
         man_dict[can['man']].append(can['can'])
 
-    cur = Curation(str(uuid.uuid4()), label)
+    cur = CurationObj(str(uuid.uuid4()), label)
     for within in man_dict.keys():
         cans = []
         for can in man_dict[within]:
