@@ -10,7 +10,8 @@ class TermCanvasAssoc(db.Model):
                         primary_key=True)
     canvas_id = db.Column('canvas_id', db.Integer, db.ForeignKey('canvas.id'),
                           primary_key=True)
-    assoc_type = db.Column('assoc_type', db.String(255))
+    metadata_type = db.Column('metadata_type', db.String(255))
+    actor = db.Column('actor', db.String(255))
     term = db.relationship('Term', back_populates='canvases')
     canvas = db.relationship('Canvas', back_populates='terms')
 

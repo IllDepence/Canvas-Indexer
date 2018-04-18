@@ -20,7 +20,8 @@ class TermCanvasAssoc(Base):
                      primary_key=True)
     canvas_id = Column('canvas_id', Integer, ForeignKey('canvas.id'),
                        primary_key=True)
-    assoc_type = Column('assoc_type', String(255))
+    metadata_type = Column('metadata_type', String(255))
+    actor = Column('actor', String(255))
     term = relationship('Term', back_populates='canvases')
     canvas = relationship('Canvas', back_populates='terms')
 
@@ -51,6 +52,19 @@ Base.metadata.create_all(engine)
 Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
+
+
+class Assoc():
+    """ Class for describing a document (in relation to a metadata term it is
+        being associated with) alongside the metatada's relative type (direct/
+        context/content) and the actor (human or software) that associated the
+        document with the metadata.
+    """
+
+    def __init__(self, doc, typ, act):
+        self.doc = doc
+        self.typ = typ
+        self.act = act
 
 
 def get_referenced(json_dict, attrib):
@@ -177,6 +191,18 @@ def build_canvas_doc(man, cur_can):
 
     return doc
 
+def build_curation_doc(cur):
+    """ Given a curation dictionary, build a document (OrderedDict) with all
+        information necessary to display the cutout as a search result.
+    """
+
+    doc = OrderedDict()
+    doc['curationUrl'] = cur['@id']
+    doc['curationLabel'] = cur['label']
+    # TODO: expand according to stub
+
+    return doc
+
 resp = requests.get(cfg.as_sources()[0])
 # ↑ TODO: support multiple sources
 #         need for one last_crawl
@@ -184,6 +210,7 @@ resp = requests.get(cfg.as_sources()[0])
 as_oc = resp.json()
 as_ocp = get_referenced(as_oc, 'last')
 term_to_canvas_index = {}
+term_to_curation_index = {}
 last_crawl = session.query(CrawlLog).order_by(desc(CrawlLog.log_id)).first()
 # for all AC pages
 while True:
@@ -195,20 +222,31 @@ while True:
                 item['type'] == 'Create' and \
                 item['object']['@type'] == 'cr:Curation':
             cur = get_referenced(item, 'object')
+            cur_doc = build_curation_doc(cur)
             for ran in cur.get('selections', []):
                 # Manifest is the same for all Canvases ahead, so get it now
                 man = get_referenced(ran, 'within')
                 for cur_can in ran.get('members'):
                     # doc
                     # TODO: mby get read and include man[_can] metadata
-                    doc = build_canvas_doc(man, cur_can)
+                    canvas_doc = build_canvas_doc(man, cur_can)
                     # terms
                     # for md in cur_can.get('metadata', []):
                     for md in cur_can.get('metadata', [{'value': 'face'}]):
                         term = md['value']
+                        # Canvas index
                         if term not in term_to_canvas_index.keys():
                             term_to_canvas_index[term] = []
-                        term_to_canvas_index[term].append(doc)
+                        can_assoc = Assoc(canvas_doc, 'direct', 'unknown')
+                        # TODO: when available in the AS or otherwise, use
+                        #       actor to info instead of 'unknown'
+                        term_to_canvas_index[term].append(can_assoc)
+
+                        # Curation index
+                        if term not in term_to_curation_index.keys():
+                            term_to_curation_index[term] = []
+                        cur_assoc = Assoc(cur_doc, 'content', 'unknown')
+                        term_to_curation_index[term].append(cur_assoc)
 
     if not as_ocp.get('prev', False):
         break
@@ -216,7 +254,7 @@ while True:
 
 # persist term_to_canvas_index entries
 new_canvases = 0
-for term_str, canvases in term_to_canvas_index.items():
+for term_str, assocs in term_to_canvas_index.items():
     # check if the term already exists, if not create it
     term = session.query(Term).filter(Term.term == term_str).first()
     if not term:
@@ -227,7 +265,8 @@ for term_str, canvases in term_to_canvas_index.items():
     # if so, add term relations if not present. maybe also check for
     #     inconsistencies, new metadata, etc.?
     # if not add it + term relations
-    for can_dict in canvases:
+    for assoc in assocs:
+        can_dict = assoc.doc
         canvas_uri = can_dict['canvasId']+can_dict['fragment']
         can = session.query(Canvas).filter(
                                     Canvas.canvas_uri == canvas_uri).first()
@@ -235,12 +274,9 @@ for term_str, canvases in term_to_canvas_index.items():
             can = Canvas(canvas_uri=canvas_uri,
                          json_string = json.dumps(can_dict))
             new_canvases += 1
-        # TODO: when available in the AS or otherwise, use assoc_type to
-        #       distinguish between e.g. human created and machine generated
-        #       term canvas association
-        assoc = TermCanvasAssoc(assoc_type='foo')
-        assoc.term = term
-        can.terms.append(assoc)
+        db_assoc = TermCanvasAssoc(metadata_type=assoc.typ, actor=assoc.act)
+        db_assoc.term = term
+        can.terms.append(db_assoc)
         session.add(can)
         session.commit()
 # persist crawl log
