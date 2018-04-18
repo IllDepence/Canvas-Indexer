@@ -24,7 +24,7 @@ def index():
     all_terms = Term.query.all()
 
     if q:
-        canvases = Canvas.query.filter(Canvas.terms.any(term=q)).all()
+        canvases = Canvas.query.join('terms', 'term').filter(Term.term == q)
     else:
         canvases = all_canvases
 
@@ -59,7 +59,7 @@ def api():
     ret['query'] = q
 
     results = []
-    canvases = Canvas.query.filter(Canvas.terms.any(term=q)).all()
+    canvases = Canvas.query.join('terms', 'term').filter(Term.term == q)
     if canvases:
         all_results = [json.loads(can.json_string,
                                   object_pairs_hook=OrderedDict)

@@ -183,7 +183,7 @@ resp = requests.get(cfg.as_sources()[0])
 #         date per source?
 as_oc = resp.json()
 as_ocp = get_referenced(as_oc, 'last')
-index = {}
+term_to_canvas_index = {}
 last_crawl = session.query(CrawlLog).order_by(desc(CrawlLog.log_id)).first()
 # for all AC pages
 while True:
@@ -206,17 +206,17 @@ while True:
                     # for md in cur_can.get('metadata', []):
                     for md in cur_can.get('metadata', [{'value': 'face'}]):
                         term = md['value']
-                        if term not in index.keys():
-                            index[term] = []
-                        index[term].append(doc)
+                        if term not in term_to_canvas_index.keys():
+                            term_to_canvas_index[term] = []
+                        term_to_canvas_index[term].append(doc)
 
     if not as_ocp.get('prev', False):
         break
     as_ocp = get_referenced(as_ocp, 'prev')
 
-# persist index entries
+# persist term_to_canvas_index entries
 new_canvases = 0
-for term_str, canvases in index.items():
+for term_str, canvases in term_to_canvas_index.items():
     # check if the term already exists, if not create it
     term = session.query(Term).filter(Term.term == term_str).first()
     if not term:
