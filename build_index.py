@@ -58,12 +58,14 @@ class Canvas(Base):
 class Curation(Base):
     __tablename__ = 'curation'
     id = Column(Integer, primary_key=True)
-    curation_uri = Column(String(2048), unique=True)  # ID + term[1]
+    curation_uri = Column(String(2048), unique=True)  # ID + term + m.d.typ.[1]
     json_string = Column(UnicodeText())
     terms = relationship('TermCurationAssoc', back_populates='curation')
     # [1] the reason for storing each curation once per associated term is that
     #     depending on the search term their representation as a search result
     #     (e.g. thumbnail) is different
+    #     furthermore the type of metadata (curation top level vs. canvas) is
+    #     used to distinguish between those two kinds of search results
 
 
 class CrawlLog(Base):
@@ -216,7 +218,7 @@ def build_canvas_doc(man, cur_can):
 
     return doc
 
-def build_curation_doc(cur, activity, canvas_doc=None):
+def build_curation_doc(cur, activity, canvas_doc=None, cur_can_idx=None):
     """ Build a document (OrderedDict) with all information necessary to
         display a search result for a Curation.
 
@@ -231,6 +233,8 @@ def build_curation_doc(cur, activity, canvas_doc=None):
     doc['curationLabel'] = cur['label']
     if canvas_doc:
         doc['curationThumbnail'] = canvas_doc['canvasThumbnail']
+    else:
+        doc['curationThumbnail'] = None
     num_canvases = 0
     for ran in cur.get('selections', []):
         num_canvases += len(ran.get('members', []))
@@ -241,9 +245,13 @@ def build_curation_doc(cur, activity, canvas_doc=None):
     doc['crawledAt'] = datetime.datetime.now().isoformat()
     # - - -
     if canvas_doc:
-        doc['canvasHit'] = {'canvasId': canvas_doc['canvasId'],
-                            'fragment': canvas_doc['fragment'],
-                            'canvasIndex': canvas_doc['canvasIndex']}
+        canvas_hit = OrderedDict()
+        canvas_hit['canvasId'] = canvas_doc['canvasId']
+        canvas_hit['fragment'] = canvas_doc['fragment']
+        canvas_hit['curationCanvasIndex'] = cur_can_idx + 1
+        doc['canvasHit'] = canvas_hit
+    else:
+        doc['canvasHit'] = None
 
     return doc
 
@@ -288,11 +296,13 @@ while True:
             for ran in cur.get('selections', []):
                 # Manifest is the same for all Canvases ahead, so get it now
                 man = get_referenced(ran, 'within')
-                for cur_can in ran.get('members'):
+                for cur_can_idx, cur_can in enumerate(ran.get('members', []) +
+                                                      ran.get('canvases', [])):
                     # doc (can)
                     # TODO: mby get read and include man[_can] metadata
                     canvas_doc = build_canvas_doc(man, cur_can)
-                    cur_doc = build_curation_doc(cur, activity, canvas_doc)
+                    cur_doc = build_curation_doc(cur, activity, canvas_doc,
+                                                 cur_can_idx)
                     if found_top_metadata and not top_doc_has_thumbnail:
                         # enhance doc (top)
                         enhance_top_meta_curation_doc(cur_top_doc, canvas_doc)
@@ -366,7 +376,7 @@ for term_str, assocs in term_to_curation_index.items():
     # if not add it + term relations
     for assoc in assocs:
         cur_dict = assoc.doc
-        cur_uri = cur_dict['curationUrl']+term.term
+        cur_uri = cur_dict['curationUrl']+term.term+assoc.typ
         cur = session.query(Curation).filter(
                     Curation.curation_uri == cur_uri).first()
         if not cur:
