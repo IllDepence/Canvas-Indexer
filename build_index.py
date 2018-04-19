@@ -216,15 +216,21 @@ def build_canvas_doc(man, cur_can):
 
     return doc
 
-def build_curation_doc(cur, activity, canvas_doc):
-    """ Given a curation dictionary, build a document (OrderedDict) with all
-        information necessary to display the cutout as a search result.
+def build_curation_doc(cur, activity, canvas_doc=None):
+    """ Build a document (OrderedDict) with all information necessary to
+        display a search result for a Curation.
+
+        If canvas_doc is given this is assumed to be a sarch result associated
+        with Canvas metadata. Otherwise (search result associated with Curation
+        top level metadata) the method enhance_top_meta_curation_doc is to be
+        used to retroactively add missing information.
     """
 
     doc = OrderedDict()
     doc['curationUrl'] = cur['@id']
     doc['curationLabel'] = cur['label']
-    doc['curationThumbnail'] = canvas_doc['canvasThumbnail']
+    if canvas_doc:
+        doc['curationThumbnail'] = canvas_doc['canvasThumbnail']
     num_canvases = 0
     for ran in cur.get('selections', []):
         num_canvases += len(ran.get('members', []))
@@ -233,8 +239,20 @@ def build_curation_doc(cur, activity, canvas_doc):
     # TODO: once implemented in JSONkeeper, use the activity's endtime in case
     #       it's an Update Activity
     doc['crawledAt'] = datetime.datetime.now().isoformat()
+    # - - -
+    if canvas_doc:
+        doc['canvasHit'] = {'canvasId': canvas_doc['canvasId'],
+                            'fragment': canvas_doc['fragment'],
+                            'canvasIndex': canvas_doc['canvasIndex']}
 
     return doc
+
+def enhance_top_meta_curation_doc(cur_doc, canvas_doc):
+    """ Retroactively add missing information to a Curation search result
+        associated with Curation top level metadata.
+    """
+
+    cur_doc['curationThumbnail'] = canvas_doc['canvasThumbnail']
 
 resp = requests.get(cfg.as_sources()[0])
 # ↑ TODO: support multiple sources
@@ -255,32 +273,47 @@ while True:
                 activity['type'] == 'Create' and \
                 activity['object']['@type'] == 'cr:Curation':
             cur = get_referenced(activity, 'object')
-            # TODO: build cur_docs for curation top level metadata
+            # doc (top)
+            cur_top_doc = build_curation_doc(cur, activity)
+            # terms (top)
+            found_top_metadata = False
+            for md in cur.get('metadata', []):
+                top_term = md['value']
+                if top_term not in term_to_curation_index.keys():
+                    term_to_curation_index[top_term] = []
+                cur_top_assoc = Assoc(cur_top_doc, 'direct', 'unknown')
+                term_to_curation_index[top_term].append(cur_top_assoc)
+                found_top_metadata = True
+            top_doc_has_thumbnail = False
             for ran in cur.get('selections', []):
                 # Manifest is the same for all Canvases ahead, so get it now
                 man = get_referenced(ran, 'within')
                 for cur_can in ran.get('members'):
-                    # doc
+                    # doc (can)
                     # TODO: mby get read and include man[_can] metadata
                     canvas_doc = build_canvas_doc(man, cur_can)
                     cur_doc = build_curation_doc(cur, activity, canvas_doc)
-                    # terms
+                    if found_top_metadata and not top_doc_has_thumbnail:
+                        # enhance doc (top)
+                        enhance_top_meta_curation_doc(cur_top_doc, canvas_doc)
+                        top_doc_has_thumbnail = True
+                    # terms (can)
                     # for md in cur_can.get('metadata', [{'value': 'face'}]):
                     for md in cur_can.get('metadata', []):
-                        term = md['value']
+                        can_term = md['value']
                         # Canvas index
-                        if term not in term_to_canvas_index.keys():
-                            term_to_canvas_index[term] = []
+                        if can_term not in term_to_canvas_index.keys():
+                            term_to_canvas_index[can_term] = []
                         can_assoc = Assoc(canvas_doc, 'direct', 'unknown')
                         # TODO: when available in the AS or otherwise, use
                         #       actor to info instead of 'unknown'
-                        term_to_canvas_index[term].append(can_assoc)
+                        term_to_canvas_index[can_term].append(can_assoc)
 
                         # Curation index
-                        if term not in term_to_curation_index.keys():
-                            term_to_curation_index[term] = []
+                        if can_term not in term_to_curation_index.keys():
+                            term_to_curation_index[can_term] = []
                         cur_assoc = Assoc(cur_doc, 'content', 'unknown')
-                        term_to_curation_index[term].append(cur_assoc)
+                        term_to_curation_index[can_term].append(cur_assoc)
 
     if not as_ocp.get('prev', False):
         break

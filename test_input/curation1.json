@@ -6,6 +6,12 @@
     "@type": "cr:Curation",
     "@id": "http://example.org/iiif/curation/curation.json",
     "label": "Curating list",
+    "metadata": [
+            {
+                "label": "subject",
+                "value": "art"
+            }
+        ],
     "selections": [
         {
             "@id": "https://manifests.britishart.yale.edu/manifest/1153/range/r1",
