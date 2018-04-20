@@ -30,8 +30,8 @@ arg | required | explanation
 q | yes | query
 start | no | 0 based index from which to start listing results from the list of all results<br>defaults to `0`
 limit | no | limit the number of results being returned<br>defaults to `null` meaning no limit
-source | no | set the type of metadata the search results should be based on to `canvas`, `curation` or `canvas|curation`<br>detaults to `canvas`
-granularity | no | set the type of search results to be returned to either `canvas` or `curation`<br>detaults to the value of source or `curation` in case source is `canvas|curation`
+source | no | set the type of metadata the search results should be based on to `canvas`, `curation` or `canvas\|curation`<br>detaults to `canvas`
+granularity | no | set the type of search results to be returned to either `canvas` or `curation`<br>detaults to the value of source or `curation` in case source is `canvas\|curation`
 
 example: `{base_url}/api?q=face&start=5&limit=10`
 
