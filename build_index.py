@@ -249,8 +249,10 @@ def build_curation_doc(cur, activity, canvas_doc=None, cur_can_idx=None):
         canvas_hit['canvasId'] = canvas_doc['canvasId']
         canvas_hit['fragment'] = canvas_doc['fragment']
         canvas_hit['curationCanvasIndex'] = cur_can_idx + 1
+        doc['curationHit'] = None
         doc['canvasHit'] = canvas_hit
     else:
+        doc['curationHit'] = True
         doc['canvasHit'] = None
 
     return doc
@@ -289,7 +291,7 @@ while True:
                 top_term = md['value']
                 if top_term not in term_to_curation_index.keys():
                     term_to_curation_index[top_term] = []
-                cur_top_assoc = Assoc(cur_top_doc, 'direct', 'unknown')
+                cur_top_assoc = Assoc(cur_top_doc, 'curation', 'unknown')
                 term_to_curation_index[top_term].append(cur_top_assoc)
                 found_top_metadata = True
             top_doc_has_thumbnail = False
@@ -314,7 +316,7 @@ while True:
                         # Canvas index
                         if can_term not in term_to_canvas_index.keys():
                             term_to_canvas_index[can_term] = []
-                        can_assoc = Assoc(canvas_doc, 'direct', 'unknown')
+                        can_assoc = Assoc(canvas_doc, 'canvas', 'unknown')
                         # TODO: when available in the AS or otherwise, use
                         #       actor to info instead of 'unknown'
                         term_to_canvas_index[can_term].append(can_assoc)
@@ -322,7 +324,7 @@ while True:
                         # Curation index
                         if can_term not in term_to_curation_index.keys():
                             term_to_curation_index[can_term] = []
-                        cur_assoc = Assoc(cur_doc, 'content', 'unknown')
+                        cur_assoc = Assoc(cur_doc, 'canvas', 'unknown')
                         term_to_curation_index[can_term].append(cur_assoc)
 
     if not as_ocp.get('prev', False):
