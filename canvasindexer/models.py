@@ -31,7 +31,9 @@ class TermCanvasAssoc(db.Model):
 class Term(db.Model):
     __tablename__ = 'term'
     id = db.Column(db.Integer, primary_key=True)
-    term = db.Column(db.String(255), unique=True)
+    term = db.Column(db.String(255))
+    qualifier = db.Column(db.String(255))
+    __table_args__ = (db.UniqueConstraint('term', 'qualifier'), )
     canvases = db.relationship('TermCanvasAssoc', back_populates='term')
     curations = db.relationship('TermCurationAssoc', back_populates='term')
 

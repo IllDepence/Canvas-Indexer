@@ -65,6 +65,7 @@ def index():
 @pd.route('/api', methods=['GET'])
 def api():
 
+    # parse request arguments
     q = request.args.get('q', False)
     if not q:
         return abort(400, 'No query given.')
@@ -73,41 +74,39 @@ def api():
         granularity = 'curation'
     else:
         granularity = request.args.get('granularity', source)
+        if granularity not in ['canvas', 'curation']:
+            granularity = 'canvas'
+    qualifier = request.args.get('qualifier', None)
     start = int(request.args.get('start', 0))
     limit = int(request.args.get('limit', -1))
 
+    # start building response
     ret = OrderedDict()
     ret['query'] = q
     ret['granularity'] = granularity
     ret['source'] = source
 
+    # select tables
     results = []
     if granularity == 'canvas':
-        if source in ['curation|canvas', 'canvas|curation']:
-            canvases = Canvas.query.join('terms', 'term').filter(
-                                    Term.term == q)
-        else:
-            canvases = Canvas.query.join('terms', 'term').filter(
-                                    Term.term == q,
-                                    TermCanvasAssoc.metadata_type == source)
-        if canvases:
-            all_results = [json.loads(can.json_string,
-                                      object_pairs_hook=OrderedDict)
-                           for can in canvases]
-        else:
-            all_results = []
+        Doc = Canvas
+        Assoc = TermCanvasAssoc
     elif granularity == 'curation':
-        if source in ['curation|canvas', 'canvas|curation']:
-            curations = Curation.query.join('terms', 'term').filter(
-                                    Term.term == q)
-        else:
-            curations = Curation.query.join('terms', 'term').filter(
-                                    Term.term == q,
-                                    TermCurationAssoc.metadata_type == source)
-        if curations:
-            all_results = [json.loads(cur.json_string,
-                                      object_pairs_hook=OrderedDict)
-                           for cur in curations]
+        Doc = Curation
+        Assoc = TermCurationAssoc
+
+    # filter records
+    docs = Doc.query.join('terms', 'term').filter(Term.term == q)
+    if source not in ['curation|canvas', 'canvas|curation']:
+        docs = docs.filter(Assoc.metadata_type == source)
+    if qualifier:
+        docs = docs.filter(Term.qualifier == qualifier)
+
+    if docs:
+        all_results = [json.loads(doc.json_string,
+                                  object_pairs_hook=OrderedDict)
+                       for doc in docs]
+        if granularity == 'curation':
             # combine curation and canvas hits
             unique_cur_urls = []
             merged_results = []
@@ -121,8 +120,10 @@ def api():
                     merged_results.append(r)
                 unique_cur_urls.append(r['curationUrl'])
             all_results = merged_results
-        else:
-            all_results = []
+    else:
+        all_results = []
+
+    # finish building response
     ret['total'] = len(all_results)
     ret['start'] = start
     results = all_results[start:]

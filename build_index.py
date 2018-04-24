@@ -4,8 +4,8 @@ import json
 import re
 import requests
 from collections import OrderedDict
-from sqlalchemy import (Column, Table, Integer, ForeignKey, String,
-                        UnicodeText, DateTime, create_engine, desc)
+from sqlalchemy import (Column, Table, Integer, ForeignKey, UniqueConstraint,
+                        String, UnicodeText, DateTime, create_engine, desc)
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
@@ -42,7 +42,9 @@ class TermCanvasAssoc(Base):
 class Term(Base):
     __tablename__ = 'term'
     id = Column(Integer, primary_key=True)
-    term = Column(String(255), unique=True)
+    term = Column(String(255))
+    qualifier = Column(String(255))
+    __table_args__ = (UniqueConstraint('term', 'qualifier'), )
     canvases = relationship('TermCanvasAssoc', back_populates='term')
     curations = relationship('TermCurationAssoc', back_populates='term')
 
@@ -61,6 +63,7 @@ class Curation(Base):
     curation_uri = Column(String(2048), unique=True)  # ID + term + m.d.typ.[1]
     json_string = Column(UnicodeText())
     terms = relationship('TermCurationAssoc', back_populates='curation')
+
     # [1] the reason for storing each curation once per associated term is that
     #     depending on the search term their representation as a search result
     #     (e.g. thumbnail) is different
@@ -184,12 +187,17 @@ def build_canvas_doc(man, cur_can):
                 # > canvas
                 img_url = man_can['images'][0]['resource']['@id']
                 # ↑ not too hardcoded?
-                url_base = '/'.join(img_url.split('/')[0:-4])
-                # ↑ guarateed to be in format:
-                #   {scheme}://{server}{/prefix}/{identifier}/
-                #   {region}/{size}/{rotation}/{quality}.
-                #   {format}
-                #   so [0:-4] cuts off /{size}/...{format}
+                if man_can['images'][0]['resource'].get('service'):
+                    service = man_can['images'][0]['resource'].get('service')
+                    url_base = service['@id']
+                #     ↑ maybe more robust than solution below?
+                else:
+                    url_base = '/'.join(img_url.split('/')[0:-4])
+                #     ↑ guarateed to be in format:
+                #       {scheme}://{server}{/prefix}/{identifier}/
+                #       {region}/{size}/{rotation}/{quality}.
+                #       {format}
+                #       so [0:-4] cuts off /{size}/...{format}
                 info_url = '{}/info.json'.format(url_base)
                 doc['canvas'] = info_url
                 # > canvasId
@@ -214,6 +222,9 @@ def build_canvas_doc(man, cur_can):
                     doc['fragment'] = url_parts[1]
                 else:
                     doc['fragment'] = ''
+                # > metadata
+                if len(cur_can.get('metadata', [])) > 0:
+                    doc['metadata'] = cur_can['metadata']
             canvas_index += 1
 
     return doc
@@ -264,14 +275,41 @@ def enhance_top_meta_curation_doc(cur_doc, canvas_doc):
 
     cur_doc['curationThumbnail'] = canvas_doc['canvasThumbnail']
 
+def build_qualifier_tuple(something):
+    """ Given something, build a (<optional_qualifier>, <term>) tuple.
+    """
+
+    if type(something) == str:
+        # 'foo' → ('', 'foo')
+        return ('', something)
+    elif type(something) in [tuple, list]:
+        # ['foo', 'bar', ...] / ('foo', 'bar', ...) → ('foo', 'bar')
+        return (something[0], something[1])
+    elif type(something) == dict:
+        label = something.get('label')
+        value = something.get('value')
+        if (label == '' or label) and (value == '' or value):
+            # {'label': 'foo', 'value': 'bar', ...} → ('foo', bar')
+            if type(value) == str:
+                return (label, value)
+            elif type(value) in [tuple, list]:
+                return (label, ', '.join([x.__repr__() for x in value]))
+            else:
+                return (label, value.__repr__())
+        else:
+            # {'foo': 'bar', ...} → ('foo', bar')
+            return (list(something.keys())[0], list(something.values())[0])
+    # <?> → ('', <?>.__repr__())
+    return ('', '{}'.format(something))
+
 resp = requests.get(cfg.as_sources()[0])
 # ↑ TODO: support multiple sources
 #         need for one last_crawl
 #         date per source?
 as_oc = resp.json()
 as_ocp = get_referenced(as_oc, 'last')
-term_to_canvas_index = {}
-term_to_curation_index = {}
+term_tup_to_canvas_index = {}
+term_tup_to_curation_index = {}
 last_crawl = session.query(CrawlLog).order_by(desc(CrawlLog.log_id)).first()
 # for all AC pages
 while True:
@@ -288,11 +326,12 @@ while True:
             # terms (top)
             found_top_metadata = False
             for md in cur.get('metadata', []):
-                top_term = md['value']
-                if top_term not in term_to_curation_index.keys():
-                    term_to_curation_index[top_term] = []
+                top_term = build_qualifier_tuple(md)
+                # Curation index
+                if top_term not in term_tup_to_curation_index.keys():
+                    term_tup_to_curation_index[top_term] = []
                 cur_top_assoc = Assoc(cur_top_doc, 'curation', 'unknown')
-                term_to_curation_index[top_term].append(cur_top_assoc)
+                term_tup_to_curation_index[top_term].append(cur_top_assoc)
                 found_top_metadata = True
             top_doc_has_thumbnail = False
             for ran in cur.get('selections', []):
@@ -309,35 +348,44 @@ while True:
                         # enhance doc (top)
                         enhance_top_meta_curation_doc(cur_top_doc, canvas_doc)
                         top_doc_has_thumbnail = True
+                    # Canvas index
+                    if top_term not in term_tup_to_canvas_index.keys():
+                        term_tup_to_canvas_index[top_term] = []
+                    can_assoc = Assoc(canvas_doc, 'curation', 'unknown')
+                    # TODO: when available in the AS or otherwise, use
+                    #       actor to info instead of 'unknown'
+                    term_tup_to_canvas_index[top_term].append(can_assoc)
                     # terms (can)
-                    # for md in cur_can.get('metadata', [{'value': 'face'}]):
                     for md in cur_can.get('metadata', []):
-                        can_term = md['value']
+                        can_term = build_qualifier_tuple(md)
                         # Canvas index
-                        if can_term not in term_to_canvas_index.keys():
-                            term_to_canvas_index[can_term] = []
+                        if can_term not in term_tup_to_canvas_index.keys():
+                            term_tup_to_canvas_index[can_term] = []
                         can_assoc = Assoc(canvas_doc, 'canvas', 'unknown')
                         # TODO: when available in the AS or otherwise, use
                         #       actor to info instead of 'unknown'
-                        term_to_canvas_index[can_term].append(can_assoc)
+                        term_tup_to_canvas_index[can_term].append(can_assoc)
 
                         # Curation index
-                        if can_term not in term_to_curation_index.keys():
-                            term_to_curation_index[can_term] = []
+                        if can_term not in term_tup_to_curation_index.keys():
+                            term_tup_to_curation_index[can_term] = []
                         cur_assoc = Assoc(cur_doc, 'canvas', 'unknown')
-                        term_to_curation_index[can_term].append(cur_assoc)
+                        term_tup_to_curation_index[can_term].append(cur_assoc)
 
     if not as_ocp.get('prev', False):
         break
     as_ocp = get_referenced(as_ocp, 'prev')
 
-# persist term_to_canvas_index entries
+# persist term_tup_to_canvas_index entries
 new_canvases = 0
-for term_str, assocs in term_to_canvas_index.items():
+for term_tup, assocs in term_tup_to_canvas_index.items():
+    qual_str = term_tup[0]
+    term_str = term_tup[1]
     # check if the term already exists, if not create it
-    term = session.query(Term).filter(Term.term == term_str).first()
+    term = session.query(Term).filter(Term.term == term_str,
+                                      Term.qualifier == qual_str).first()
     if not term:
-        term = Term(term=term_str)
+        term = Term(term=term_str, qualifier=qual_str)
         session.add(term)
         session.commit()
     # check if the canvas already exists (Canvas URI = ID + fragment)
@@ -365,12 +413,15 @@ for term_str, assocs in term_to_canvas_index.items():
                                        actor=assoc.act)
             session.add(db_assoc)
         session.commit()
-# persist term_to_curation_index entries
-for term_str, assocs in term_to_curation_index.items():
+# persist term_tup_to_curation_index entries
+for term_tup, assocs in term_tup_to_curation_index.items():
+    qual_str = term_tup[0]
+    term_str = term_tup[1]
     # check if the term already exists, if not create it
-    term = session.query(Term).filter(Term.term == term_str).first()
+    term = session.query(Term).filter(Term.term == term_str,
+                                      Term.qualifier == qual_str).first()
     if not term:
-        term = Term(term=term_str)
+        term = Term(term=term_str, qualifier=qual_str)
         session.add(term)
         session.commit()
     # check if the curation already exists
