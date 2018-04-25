@@ -67,8 +67,10 @@ def api():
 
     # parse request arguments
     q = request.args.get('q', False)
-    if not q:
-        return abort(400, 'No query given.')
+    prprty = request.args.get('property', False)
+    value = request.args.get('value', False)
+    if not (q or (prprty and value)):
+        return abort(400, 'No query or property value pair given.')
     source = request.args.get('source', 'canvas')
     if source in ['curation|canvas', 'canvas|curation']:
         granularity = 'curation'
@@ -76,15 +78,23 @@ def api():
         granularity = request.args.get('granularity', source)
         if granularity not in ['canvas', 'curation']:
             granularity = 'canvas'
-    qualifier = request.args.get('qualifier', None)
+    if request.args.get('fuzzy') == 'false':
+        fuzzy = False
+    else:
+        fuzzy = True
     start = int(request.args.get('start', 0))
     limit = int(request.args.get('limit', -1))
 
     # start building response
     ret = OrderedDict()
-    ret['query'] = q
+    if q:
+        ret['query'] = q
+    else:
+        ret['property'] = prprty
+        ret['value'] = value
     ret['granularity'] = granularity
     ret['source'] = source
+    ret['fuzzy'] = fuzzy
 
     # select tables
     results = []
@@ -96,11 +106,20 @@ def api():
         Assoc = TermCurationAssoc
 
     # filter records
-    docs = Doc.query.join('terms', 'term').filter(Term.term == q)
+    docs = Doc.query.join('terms', 'term')
     if source not in ['curation|canvas', 'canvas|curation']:
         docs = docs.filter(Assoc.metadata_type == source)
-    if qualifier:
-        docs = docs.filter(Term.qualifier == qualifier)
+    if q:
+        if fuzzy:
+            docs = docs.filter(Term.term.ilike('%{}%'.format(q)))
+        else:
+            docs = docs.filter(Term.term == q)
+    elif prprty:
+        if fuzzy:
+            docs = docs.filter(Term.term.ilike('%{}%'.format(value)),
+                               Term.qualifier == prprty)
+        else:
+            docs = docs.filter(Term.term == value, Term.qualifier == prprty)
 
     if docs:
         all_results = [json.loads(doc.json_string,

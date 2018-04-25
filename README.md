@@ -25,13 +25,16 @@ crawler | as\_sources | [] | comma seperated list of links to [Activity Streams]
 path: `{base_url}/api`  
 arguments:
 
-arg | required | explanation
+arg | default | explanation
 --- | -------- | -----------
-q | yes | query
-start | no | 0 based index from which to start listing results from the list of all results<br>defaults to `0`
-limit | no | limit the number of results being returned<br>defaults to `null` meaning no limit
-source | no | set the type of metadata the search results should be based on to `canvas`, `curation` or `canvas\|curation`<br>detaults to `canvas`
-granularity | no | set the type of search results to be returned to either `canvas` or `curation`<br>detaults to the value of source or `curation` in case source is `canvas\|curation`
+q |  | search keyword. takes precedence over property+value
+property |  | used to search by a property+value pair. requires value
+value |  | used to search by a property+value pair. requires property
+fuzzy | `true` | allow for fuzzy matching for q or value
+start | `0` | 0 based index from which to start listing results from the list of all results
+limit | `null` meaning no limit | limit the number of results being returned
+source | `canvas` | set the type of metadata the search results should be based on to `canvas`, `curation` or `canvas\|curation`
+granularity | value of source (`curation` if `canvas\|curation`) | set the type of search results to be returned to either `canvas` or `curation`
 
 example: `{base_url}/api?q=face&start=5&limit=10`
 
