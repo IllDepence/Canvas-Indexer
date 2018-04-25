@@ -51,8 +51,9 @@ def index():
                       for can in canvas_dicts]
 
 
-    status = ('&gt; Crawling canvas cutouts from: "{}".<br>&gt; Currently storing {} canva'
-              'ses associated with {} keywords.<br>&gt; Available keywords: "{}"'
+    status = ('&gt; Crawling canvas cutouts from: "{}".<br>&gt; Currently stor'
+              'ing {} canvases associated with {} keywords.<br>&gt; Available '
+              'keywords: "{}"'
              ).format('", "'.join(current_app.cfg.as_sources()),
                       len(all_canvases),
                       len(all_terms),
@@ -61,6 +62,29 @@ def index():
 
     return render_template('index.html', canvases=canvas_digests,
                            status=status)
+
+@pd.route('/facets', methods=['GET'])
+def facets():
+
+    terms = Term.query.all()
+    facet_map = {}
+    for term in terms:
+        if term.qualifier not in facet_map:
+            facet_map[term.qualifier] = []
+        if term.term not in facet_map[term.qualifier]:
+            facet_map[term.qualifier].append(term.term)
+
+    ret = OrderedDict()
+    ret['facets'] = []
+    for key, val in facet_map.items():
+        facet = OrderedDict()
+        facet['label'] = key
+        facet['value'] = val
+        ret['facets'].append(facet)
+
+    resp = Response(json.dumps(ret, indent=4))
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
 
 @pd.route('/api', methods=['GET'])
 def api():
