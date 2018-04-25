@@ -66,7 +66,8 @@ def index():
 @pd.route('/facets', methods=['GET'])
 def facets():
 
-    terms = Term.query.all()
+    terms = Term.query.join(TermCanvasAssoc)
+    terms = terms.filter(TermCanvasAssoc.metadata_type == 'canvas').all()
     facet_map = {}
     for term in terms:
         if term.qualifier not in facet_map:
@@ -76,10 +77,19 @@ def facets():
 
     ret = OrderedDict()
     ret['facets'] = []
-    for key, val in facet_map.items():
+    for label, vals in facet_map.items():
+        assocs = TermCanvasAssoc.query.join(Term)
+        assocs = assocs.filter(TermCanvasAssoc.metadata_type == 'canvas',
+                               TermCanvasAssoc.term_id == Term.id,
+                               Term.qualifier == label).all()
         facet = OrderedDict()
-        facet['label'] = key
-        facet['value'] = val
+        facet['label'] = label
+        facet['value'] = []
+        for val in vals:
+            entry = OrderedDict()
+            entry['term'] = val
+            entry['frequency'] = len([a for a in assocs if a.term.term == val])
+            facet['value'].append(entry)
         ret['facets'].append(facet)
 
     resp = Response(json.dumps(ret, indent=4))
