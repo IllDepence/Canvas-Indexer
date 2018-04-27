@@ -27,16 +27,15 @@ arguments:
 
 arg | default | explanation
 --- | -------- | -----------
-q |  | search keyword. takes precedence over property+value
-property |  | used to search by a property+value pair. requires value
-value |  | used to search by a property+value pair. requires property
-fuzzy | `true` | allow for fuzzy matching for q or value
+select | `curation` | set the type of search results to be returned to either `canvas` or `curation`
+from | `curation,canvas` | set the type of metadata the search results should be based on to `canvas`, `curation` or a comma seperated list of aforementioned
+where |  | search keyword
+where\_metadata\_label |  | used to search by a property+value pair. requires where\_metadata\_value
+where\_metadata\_value |  | used to search by a property+value pair. requires where\_metadata\_label
 start | `0` | 0 based index from which to start listing results from the list of all results
 limit | `null` meaning no limit | limit the number of results being returned
-source | `canvas` | set the type of metadata the search results should be based on to `canvas`, `curation` or `canvas\|curation`
-granularity | value of source (`curation` if `canvas\|curation`) | set the type of search results to be returned to either `canvas` or `curation`
 
-example: `{base_url}/api?q=face&start=5&limit=10`
+example: `{base_url}/api?select=canvas&from=canvas,curation&where=face`
 
 - - -
 

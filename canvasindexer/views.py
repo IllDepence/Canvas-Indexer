@@ -100,66 +100,82 @@ def facets():
 def api():
 
     # parse request arguments
-    q = request.args.get('q', False)
-    prprty = request.args.get('property', False)
-    value = request.args.get('value', False)
-    if not (q or (prprty and value)):
-        return abort(400, 'No query or property value pair given.')
-    source = request.args.get('source', 'canvas')
-    if source in ['curation|canvas', 'canvas|curation']:
-        granularity = 'curation'
-    else:
-        granularity = request.args.get('granularity', source)
-        if granularity not in ['canvas', 'curation']:
-            granularity = 'canvas'
-    if request.args.get('fuzzy') == 'false':
-        fuzzy = False
-    else:
+    # select
+    select = request.args.get('select', 'curation')
+    if select not in ['curation', 'canvas']:
+        return abort(400, 'Mandatory parameter "select" must be either "curati'
+                          'on" or "canvas".')
+    # from
+    valid_froms = True
+    vrom = request.args.get('from', 'curation,canvas')
+    for v in vrom.split(','):
+        if v not in ['curation', 'canvas']:
+            valid_froms = False
+    if not valid_froms:
+        return abort(400, 'Mandatory parameter "from" must be a comma seperate'
+                          'd list (length >= 1), containing only the terms "cu'
+                          'ration" and "canvas".')
+    # where*
+    where = request.args.get('where', False)
+    where_metadata_label = request.args.get('where_metadata_label', False)
+    where_metadata_value = request.args.get('where_metadata_value', False)
+    if (where and where_metadata_label and where_metadata_value) or \
+            (where_metadata_label and not where_metadata_value) or \
+            (where_metadata_value and not where_metadata_label):
+        return abort(400, 'You can either set parameter "where" or set both pa'
+                          'rameters "where_metadata_label" and "where_metadata'
+                          '_value')
+    if where:
         fuzzy = True
+    else:
+        fuzzy = False
     start = int(request.args.get('start', 0))
     limit = int(request.args.get('limit', -1))
 
     # start building response
     ret = OrderedDict()
-    if q:
-        ret['query'] = q
+    ret['select'] = select
+    ret['from'] = vrom
+    if where:
+        ret['where'] = where
     else:
-        ret['property'] = prprty
-        ret['value'] = value
-    ret['granularity'] = granularity
-    ret['source'] = source
-    ret['fuzzy'] = fuzzy
+        ret['where_metadata_label'] = where_metadata_label
+        ret['where_metadata_value'] = where_metadata_value
+    # ret['fuzzy'] = fuzzy
 
     # select tables
     results = []
-    if granularity == 'canvas':
+    if select == 'canvas':
         Doc = Canvas
         Assoc = TermCanvasAssoc
-    elif granularity == 'curation':
+    elif select == 'curation':
         Doc = Curation
         Assoc = TermCurationAssoc
 
     # filter records
     docs = Doc.query.join('terms', 'term')
-    if source not in ['curation|canvas', 'canvas|curation']:
-        docs = docs.filter(Assoc.metadata_type == source)
-    if q:
+    if vrom not in ['curation,canvas', 'canvas,curation']:
+        docs = docs.filter(Assoc.metadata_type == vrom)
+    if where:
         if fuzzy:
-            docs = docs.filter(Term.term.ilike('%{}%'.format(q)))
+            docs = docs.filter(Term.term.ilike('%{}%'.format(where)))
         else:
-            docs = docs.filter(Term.term == q)
-    elif prprty:
+            docs = docs.filter(Term.term == where)
+    elif where_metadata_label:
         if fuzzy:
-            docs = docs.filter(Term.term.ilike('%{}%'.format(value)),
-                               Term.qualifier == prprty)
+            docs = docs.filter(Term.term.ilike('%{}%'.format(
+                                                        where_metadata_value
+                                                            )),
+                               Term.qualifier == where_metadata_label)
         else:
-            docs = docs.filter(Term.term == value, Term.qualifier == prprty)
+            docs = docs.filter(Term.term == where_metadata_value,
+                               Term.qualifier == where_metadata_label)
 
     if docs:
         all_results = [json.loads(doc.json_string,
                                   object_pairs_hook=OrderedDict)
                        for doc in docs]
-        if granularity == 'curation':
+        if select == 'curation':
             # combine curation and canvas hits
             unique_cur_urls = []
             merged_results = []
