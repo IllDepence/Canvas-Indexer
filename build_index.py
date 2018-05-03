@@ -3,6 +3,7 @@ import dateutil.parser
 import json
 import re
 import requests
+import sys
 from collections import OrderedDict
 from sqlalchemy import (Column, Table, Integer, ForeignKey, UniqueConstraint,
                         String, UnicodeText, DateTime, create_engine, desc)
@@ -205,7 +206,7 @@ def build_canvas_doc(man, cur_can):
                 # > canvasCursorIndex (CODH Cursor API specific)
                 doc['canvasCursorIndex'] = man_can.get('cursorIndex', None)
                 # > canvasLabel
-                doc['canvasLabel'] = man_can['label']
+                doc['canvasLabel'] = man_can.get('label')
                 # > canvasThumbnail
                 resp = requests.get(info_url)
                 info_dict = resp.json()
@@ -302,10 +303,17 @@ def build_qualifier_tuple(something):
     # <?> → ('', <?>.__repr__())
     return ('', '{}'.format(something))
 
-resp = requests.get(cfg.as_sources()[0])
-# ↑ TODO: support multiple sources
-#         need for one last_crawl
-#         date per source?
+try:
+    resp = requests.get(cfg.as_sources()[0])
+    # ↑ TODO: support multiple sources
+    #         need for one last_crawl
+    #         date per source?
+except requests.exceptions.RequestException as e:
+    print('Could not access Activity Stream. ({})'.format(e))
+    sys.exit(1)
+if resp.status_code != 200:
+    print('Could not access Activity Stream. (HTTP {})'.format(resp.status_code))
+    sys.exit(1)
 as_oc = resp.json()
 as_ocp = get_referenced(as_oc, 'last')
 term_tup_to_canvas_index = {}
@@ -348,13 +356,13 @@ while True:
                         # enhance doc (top)
                         enhance_top_meta_curation_doc(cur_top_doc, canvas_doc)
                         top_doc_has_thumbnail = True
-                    # Canvas index
-                    if top_term not in term_tup_to_canvas_index.keys():
-                        term_tup_to_canvas_index[top_term] = []
-                    can_assoc = Assoc(canvas_doc, 'curation', 'unknown')
-                    # TODO: when available in the AS or otherwise, use
-                    #       actor to info instead of 'unknown'
-                    term_tup_to_canvas_index[top_term].append(can_assoc)
+                        # Canvas index
+                        if top_term not in term_tup_to_canvas_index.keys():
+                            term_tup_to_canvas_index[top_term] = []
+                        can_assoc = Assoc(canvas_doc, 'curation', 'unknown')
+                        # TODO: when available in the AS or otherwise, use
+                        #       actor to info instead of 'unknown'
+                        term_tup_to_canvas_index[top_term].append(can_assoc)
                     # terms (can)
                     for md in cur_can.get('metadata', []):
                         can_term = build_qualifier_tuple(md)
