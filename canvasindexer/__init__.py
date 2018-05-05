@@ -5,11 +5,13 @@
 """
 
 from flask import Flask
+from flask_cors import CORS
 from canvasindexer.config import Cfg
 
 def create_app(**kwargs):
     app = Flask(__name__)
     with app.app_context():
+        CORS(app)
         app.cfg = Cfg()
         if kwargs:
             app.testing = True

@@ -26,7 +26,7 @@ def combine(cr1, cr2):
     return has_cur
 
 
-@pd.route('/', methods=['GET', 'POST'])
+# @pd.route('/', methods=['GET', 'POST'])
 def index():
     """ Index page.
     """
