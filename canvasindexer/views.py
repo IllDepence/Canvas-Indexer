@@ -87,8 +87,8 @@ def facets():
         facet['value'] = []
         for val in vals:
             entry = OrderedDict()
-            entry['term'] = val
-            entry['frequency'] = len([a for a in assocs if a.term.term == val])
+            entry['label'] = val
+            entry['value'] = len([a for a in assocs if a.term.term == val])
             facet['value'].append(entry)
         ret['facets'].append(facet)
 
