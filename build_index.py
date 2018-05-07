@@ -186,21 +186,27 @@ def build_canvas_doc(man, cur_can):
         for man_can in seq.get('canvases', []):
             if man_can['@id'] in cur_can['@id']:
                 # > canvas
-                img_url = man_can['images'][0]['resource']['@id']
-                # ↑ not too hardcoded?
+                # info.json
                 if man_can['images'][0]['resource'].get('service'):
                     service = man_can['images'][0]['resource'].get('service')
                     url_base = service['@id']
                 #     ↑ maybe more robust than solution below?
                 else:
-                    url_base = '/'.join(img_url.split('/')[0:-4])
-                #     ↑ guarateed to be in format:
+                    mby_img_url = man_can['images'][0]['resource']['@id']
+                    url_base = '/'.join(mby_img_url.split('/')[0:-4])
+                #     ↑ if img resource @id in recommended format
                 #       {scheme}://{server}{/prefix}/{identifier}/
                 #       {region}/{size}/{rotation}/{quality}.
                 #       {format}
-                #       so [0:-4] cuts off /{size}/...{format}
+                #       then [0:-4] cuts off /{size}/...{format}
                 info_url = '{}/info.json'.format(url_base)
                 doc['canvas'] = info_url
+                resp = requests.get(info_url)
+                info_dict = resp.json()
+                profile = info_dict.get('profile')
+                img_url = '{}{}'.format(info_dict.get('@id'),
+                                        '/full/full/0/default.jpg')
+
                 # > canvasId
                 doc['canvasId'] = man_can['@id']
                 # > canvasCursorIndex (CODH Cursor API specific)
@@ -208,9 +214,6 @@ def build_canvas_doc(man, cur_can):
                 # > canvasLabel
                 doc['canvasLabel'] = man_can.get('label')
                 # > canvasThumbnail
-                resp = requests.get(info_url)
-                info_dict = resp.json()
-                profile = info_dict.get('profile')
                 comp_lvl = get_img_compliance_level(profile)
                 doc['canvasThumbnail'] = thumbnail_url(img_url, cur_can['@id'],
                                                        200, 200, comp_lvl,
