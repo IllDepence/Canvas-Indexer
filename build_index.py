@@ -223,7 +223,13 @@ def build_canvas_doc(man, cur_can):
     for seq in man.get('sequences', []):
         canvas_index = 1
         for man_can in seq.get('canvases', []):
-            if man_can['@id'] in cur_can['@id']:
+            # if man_can['@id'] in cur_can['@id']:
+            # ↑ this selects wrong pages for ID schemes like
+            # http://dcollections.lib.keio.ac.jp/ [...] /NRE/110X-444-2-2/page1
+            # http://dcollections.lib.keio.ac.jp/ [...] /NRE/110X-444-2-2/page10
+
+            # ↓ this should always find a match, right?
+            if man_can['@id'] == cur_can['@id'].split('#')[0]:
                 # > canvas
                 # info.json
                 if man_can['images'][0]['resource'].get('service'):
