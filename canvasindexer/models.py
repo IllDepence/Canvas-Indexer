@@ -59,3 +59,9 @@ class CrawlLog(db.Model):
     log_id = db.Column(db.Integer(), autoincrement=True, primary_key=True)
     datetime = db.Column(db.DateTime(timezone=True), server_default=func.now())
     new_canvases = db.Column(db.Integer())
+
+
+class FacetList(db.Model):
+    __tablename__ = 'facetlist'
+    id = db.Column(db.Integer(), autoincrement=True, primary_key=True)
+    json_string = db.Column(db.UnicodeText())

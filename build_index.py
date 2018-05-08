@@ -78,6 +78,13 @@ class CrawlLog(Base):
     datetime = Column(DateTime(timezone=True), server_default=func.now())
     new_canvases = Column(Integer())
 
+
+class FacetList(Base):
+    __tablename__ = 'facetlist'
+    id = Column(Integer(), autoincrement=True, primary_key=True)
+    json_string = Column(UnicodeText())
+
+
 engine = create_engine(cfg.db_uri())
 Base.metadata.create_all(engine)
 Base.metadata.bind = engine
@@ -97,6 +104,38 @@ class Assoc():
         self.typ = typ
         self.act = act
 
+def build_facet_list():
+    """ From the current DB state, pre build the response for requests to the
+        /facets path.
+    """
+
+    terms = session.query(Term).join(TermCanvasAssoc)
+    terms = terms.filter(TermCanvasAssoc.metadata_type == 'canvas').all()
+    facet_map = {}
+    for term in terms:
+        if term.qualifier not in facet_map:
+            facet_map[term.qualifier] = []
+        if term.term not in facet_map[term.qualifier]:
+            facet_map[term.qualifier].append(term.term)
+
+    ret = OrderedDict()
+    ret['facets'] = []
+    for label, vals in facet_map.items():
+        assocs = session.query(TermCanvasAssoc).join(Term)
+        assocs = assocs.filter(TermCanvasAssoc.metadata_type == 'canvas',
+                               TermCanvasAssoc.term_id == Term.id,
+                               Term.qualifier == label).all()
+        facet = OrderedDict()
+        facet['label'] = label
+        facet['value'] = []
+        for val in vals:
+            entry = OrderedDict()
+            entry['label'] = val
+            entry['value'] = len([a for a in assocs if a.term.term == val])
+            facet['value'].append(entry)
+        ret['facets'].append(facet)
+
+    return ret
 
 def get_referenced(json_dict, attrib):
     """ Get a value (of an attribute in a dict) that is not included in its
@@ -461,4 +500,13 @@ for term_tup, assocs in term_tup_to_curation_index.items():
 # persist crawl log
 log = CrawlLog(new_canvases=new_canvases)
 session.add(log)
+session.commit()
+# build and persist facet list
+facet_list = build_facet_list()
+db_entry = session.query(FacetList).first()
+if not db_entry:
+    db_entry = FacetList(json_string = json.dumps(facet_list))
+else:
+    db_entry.json_string = json.dumps(facet_list)
+session.add(db_entry)
 session.commit()

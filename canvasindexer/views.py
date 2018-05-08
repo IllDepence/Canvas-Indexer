@@ -5,7 +5,7 @@ from collections import OrderedDict
 from flask import (abort, Blueprint, current_app, redirect, request, jsonify,
                    Response, url_for, render_template)
 from util.iiif import Curation as CurationObj
-from canvasindexer.models import (db, Term, Canvas, Curation,
+from canvasindexer.models import (db, Term, Canvas, Curation, FacetList,
                                   TermCanvasAssoc, TermCurationAssoc)
 
 pd = Blueprint('pd', __name__)
@@ -26,7 +26,7 @@ def combine(cr1, cr2):
     return has_cur
 
 
-# @pd.route('/', methods=['GET', 'POST'])
+@pd.route('/', methods=['GET', 'POST'])
 def index():
     """ Index page.
     """
@@ -66,33 +66,10 @@ def index():
 @pd.route('/facets', methods=['GET'])
 def facets():
 
-    terms = Term.query.join(TermCanvasAssoc)
-    terms = terms.filter(TermCanvasAssoc.metadata_type == 'canvas').all()
-    facet_map = {}
-    for term in terms:
-        if term.qualifier not in facet_map:
-            facet_map[term.qualifier] = []
-        if term.term not in facet_map[term.qualifier]:
-            facet_map[term.qualifier].append(term.term)
+    db_entry = FacetList.query.first()
+    facet_list = json.loads(db_entry.json_string)
 
-    ret = OrderedDict()
-    ret['facets'] = []
-    for label, vals in facet_map.items():
-        assocs = TermCanvasAssoc.query.join(Term)
-        assocs = assocs.filter(TermCanvasAssoc.metadata_type == 'canvas',
-                               TermCanvasAssoc.term_id == Term.id,
-                               Term.qualifier == label).all()
-        facet = OrderedDict()
-        facet['label'] = label
-        facet['value'] = []
-        for val in vals:
-            entry = OrderedDict()
-            entry['label'] = val
-            entry['value'] = len([a for a in assocs if a.term.term == val])
-            facet['value'].append(entry)
-        ret['facets'].append(facet)
-
-    resp = Response(json.dumps(ret, indent=4))
+    resp = Response(json.dumps(facet_list, indent=4))
     resp.headers['Content-Type'] = 'application/json'
     return resp
 
