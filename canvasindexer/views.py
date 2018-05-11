@@ -28,8 +28,11 @@ def combine(cr1, cr2):
 
 @pd.route('/', methods=['GET', 'POST'])
 def index():
-    """ Index page.
+    """ Index page. Only accessible when running in debug mode.
     """
+
+    if not current_app.debug:
+        return abort(404)
 
     # look for query
     q = False
@@ -67,7 +70,8 @@ def index():
 def facets():
 
     db_entry = FacetList.query.first()
-    facet_list = json.loads(db_entry.json_string)
+    facet_list = json.loads(db_entry.json_string,
+                            object_pairs_hook=OrderedDict)
 
     resp = Response(json.dumps(facet_list, indent=4))
     resp.headers['Content-Type'] = 'application/json'

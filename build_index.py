@@ -129,10 +129,37 @@ def build_facet_list():
         facet['label'] = label
         facet['value'] = []
         for val in vals:
-            entry = OrderedDict()
-            entry['label'] = val
-            entry['value'] = len([a for a in assocs if a.term.term == val])
-            facet['value'].append(entry)
+            unkown_count = 0
+            human_count = 0
+            software_count = 0
+            for a in assocs:
+                if a.term.term == val:
+                    if a.actor == 'human':
+                        human_count += 1
+                    elif a.actor == 'software':
+                        software_count += 1
+                    else:
+                        unkown_count += 1
+            # unknwon actor
+            if unkown_count > 0:
+                entry = OrderedDict()
+                entry['label'] = val
+                entry['value'] = unkown_count
+                facet['value'].append(entry)
+            # human actor
+            if human_count > 0:
+                entry = OrderedDict()
+                entry['label'] = val
+                entry['value'] = human_count
+                facet['value'].append(entry)
+                entry['agent'] = 'human'
+            # software actor
+            if software_count > 0:
+                entry = OrderedDict()
+                entry['label'] = val
+                entry['value'] = software_count
+                facet['value'].append(entry)
+                entry['agent'] = 'software'
         ret['facets'].append(facet)
 
     return ret
@@ -274,6 +301,9 @@ def build_canvas_doc(man, cur_can):
                 # > metadata
                 if len(cur_can.get('metadata', [])) > 0:
                     doc['metadata'] = cur_can['metadata']
+
+                # found the maching canvas, so there's no need to continue
+                break
             canvas_index += 1
 
     return doc
@@ -351,6 +381,15 @@ def build_qualifier_tuple(something):
     # <?> → ('', <?>.__repr__())
     return ('', '{}'.format(something))
 
+def log(msg):
+    """ Write a log message.
+    """
+
+    timestamp = str(datetime.datetime.now()).split('.')[0]
+    print('[{}]   {}'.format(timestamp, msg))
+
+
+log('starting')
 try:
     resp = requests.get(cfg.as_sources()[0])
     # ↑ TODO: support multiple sources
@@ -367,32 +406,42 @@ as_ocp = get_referenced(as_oc, 'last')
 term_tup_to_canvas_index = {}
 term_tup_to_curation_index = {}
 last_crawl = session.query(CrawlLog).order_by(desc(CrawlLog.log_id)).first()
-# for all AC pages
+log('going through AS')
+# for all AS pages
 while True:
     # for all AC items
+    log('going through AS page {}'.format(as_ocp['id']))
     for activity in as_ocp['orderedItems']:
+        log('going through {} item {}'.format(activity['type'],
+                                              activity['id']))
         activity_end_time = dateutil.parser.parse(activity['endTime'])
         # if we haven't seen it yet and it's a Curation create
         if (not last_crawl or activity_end_time > last_crawl.datetime) and \
                 activity['type'] == 'Create' and \
                 activity['object']['@type'] == 'cr:Curation':
+            log('retrieving curation {}'.format(activity['object']['@id']))
             cur = get_referenced(activity, 'object')
             # doc (top)
             cur_top_doc = build_curation_doc(cur, activity)
             # terms (top)
             found_top_metadata = False
+            log('going through top level metadata')
             for md in cur.get('metadata', []):
                 top_term = build_qualifier_tuple(md)
                 # Curation index
                 if top_term not in term_tup_to_curation_index.keys():
                     term_tup_to_curation_index[top_term] = []
-                cur_top_assoc = Assoc(cur_top_doc, 'curation', 'unknown')
+                top_actor = md.get('agent', 'unknown')
+                cur_top_assoc = Assoc(cur_top_doc, 'curation', top_actor)
                 term_tup_to_curation_index[top_term].append(cur_top_assoc)
                 found_top_metadata = True
             top_doc_has_thumbnail = False
+            log('entering ranges')
             for ran in cur.get('selections', []):
                 # Manifest is the same for all Canvases ahead, so get it now
                 man = get_referenced(ran, 'within')
+                todo = len(ran.get('members', []) + ran.get('canvases', []))
+                log('processing {} canvases'.format(todo))
                 for cur_can_idx, cur_can in enumerate(ran.get('members', []) +
                                                       ran.get('canvases', [])):
                     # doc (can)
@@ -407,9 +456,7 @@ while True:
                         # Canvas index
                         if top_term not in term_tup_to_canvas_index.keys():
                             term_tup_to_canvas_index[top_term] = []
-                        can_assoc = Assoc(canvas_doc, 'curation', 'unknown')
-                        # TODO: when available in the AS or otherwise, use
-                        #       actor to info instead of 'unknown'
+                        can_assoc = Assoc(canvas_doc, 'curation', top_actor)
                         term_tup_to_canvas_index[top_term].append(can_assoc)
                     # terms (can)
                     for md in cur_can.get('metadata', []):
@@ -417,30 +464,39 @@ while True:
                         # Canvas index
                         if can_term not in term_tup_to_canvas_index.keys():
                             term_tup_to_canvas_index[can_term] = []
-                        can_assoc = Assoc(canvas_doc, 'canvas', 'unknown')
-                        # TODO: when available in the AS or otherwise, use
-                        #       actor to info instead of 'unknown'
+                        can_actor = md.get('agent', 'unknown')
+                        can_assoc = Assoc(canvas_doc, 'canvas', can_actor)
                         term_tup_to_canvas_index[can_term].append(can_assoc)
 
                         # Curation index
                         if can_term not in term_tup_to_curation_index.keys():
                             term_tup_to_curation_index[can_term] = []
-                        cur_assoc = Assoc(cur_doc, 'canvas', 'unknown')
+                        cur_assoc = Assoc(cur_doc, 'canvas', can_actor)
                         term_tup_to_curation_index[can_term].append(cur_assoc)
+                log('done')
+        else:
+            log('skipping')
 
     if not as_ocp.get('prev', False):
         break
     as_ocp = get_referenced(as_ocp, 'prev')
+    sys.stdout.flush()
 
+sys.stdout.flush()
+
+log('persisting term_tup_to_canvas_index')
 # persist term_tup_to_canvas_index entries
 new_canvases = 0
 for term_tup, assocs in term_tup_to_canvas_index.items():
     qual_str = term_tup[0]
     term_str = term_tup[1]
     # check if the term already exists, if not create it
+    log('check for existing term')
     term = session.query(Term).filter(Term.term == term_str,
                                       Term.qualifier == qual_str).first()
+    log('done')
     if not term:
+        log('creating new term')
         term = Term(term=term_str, qualifier=qual_str)
         session.add(term)
         session.commit()
@@ -448,27 +504,36 @@ for term_tup, assocs in term_tup_to_canvas_index.items():
     # if so, add term relations if not present. maybe also check for
     #     inconsistencies, new metadata, etc.?
     # if not add it + term relations
+    log('going through {} associations'.format(len(assocs)))
     for assoc in assocs:
         can_dict = assoc.doc
         canvas_uri = can_dict['canvasId']+can_dict['fragment']
+        log('checking for existing curation')
         can = session.query(Canvas).filter(
                                     Canvas.canvas_uri == canvas_uri).first()
+        log('done')
         if not can:
+            log('creating new curation')
             can = Canvas(canvas_uri=canvas_uri,
                          json_string=json.dumps(can_dict))
             new_canvases += 1
             session.add(can)
             session.commit()
+        log('checking for existing association')
         already_associated = session.query(TermCanvasAssoc).filter(
                                         TermCanvasAssoc.canvas_id == can.id,
                                         TermCanvasAssoc.term_id == term.id
                                                                   ).first()
+        log('done')
         if not already_associated:
+            log('creating new association')
             db_assoc = TermCanvasAssoc(term=term, canvas=can,
                                        metadata_type=assoc.typ,
                                        actor=assoc.act)
             session.add(db_assoc)
         session.commit()
+    sys.stdout.flush()
+log('persisting term_tup_to_curation_index')
 # persist term_tup_to_curation_index entries
 for term_tup, assocs in term_tup_to_curation_index.items():
     qual_str = term_tup[0]
@@ -503,12 +568,15 @@ for term_tup, assocs in term_tup_to_curation_index.items():
                                          actor=assoc.act)
             session.add(cur)
         session.commit()
+log('persisting crawl log')
 # persist crawl log
 log = CrawlLog(new_canvases=new_canvases)
 session.add(log)
 session.commit()
+log('generating facet list')
 # build and persist facet list
 facet_list = build_facet_list()
+log('persisting facet list')
 db_entry = session.query(FacetList).first()
 if not db_entry:
     db_entry = FacetList(json_string = json.dumps(facet_list))

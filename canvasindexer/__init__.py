@@ -13,8 +13,6 @@ def create_app(**kwargs):
     with app.app_context():
         CORS(app)
         app.cfg = Cfg()
-        if kwargs:
-            app.testing = True
 
         app.config['SQLALCHEMY_DATABASE_URI'] = app.cfg.db_uri()
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
