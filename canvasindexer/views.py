@@ -161,10 +161,14 @@ def api():
     docs = docs.join(assocs).join(terms).all()
 
     if docs:
-        all_results = [json.loads(doc.json_string,
-                                  object_pairs_hook=OrderedDict)
-                       for doc in docs]
         if select == 'curation':
+            # because of result combining we "need" to go through all results
+            #
+            # (first selecting for curations with limit applied (if given) and
+            # then looking for corresponding canvas results is probably faster)
+            all_results = [json.loads(doc.json_string,
+                                      object_pairs_hook=OrderedDict)
+                           for doc in docs]
             # combine curation and canvas hits
             unique_cur_urls = []
             merged_results = []
@@ -190,17 +194,30 @@ def api():
                     merged_results.append(r)
                 unique_cur_urls.append(r['curationUrl'])
             all_results = merged_results
+            # apply start & limit
+            results = all_results[start:]
+            if len(results) > limit:
+                results = results[0:limit]
+        else:
+            # for canvases, there is no result joining, so we can use start
+            # and limit to reduce the amount of result JSON string parsing
+            all_results = docs  # later only used for len(all_results)
+            results = []
+            for i, doc in enumerate(docs):
+                if limit >= 0 and i<start:
+                    continue
+                if limit >= 0 and i>=start+limit:
+                    break
+                results.append(json.loads(doc.json_string,
+                                          object_pairs_hook=OrderedDict))
     else:
         all_results = []
 
     # finish building response
     ret['total'] = len(all_results)
     ret['start'] = start
-    results = all_results[start:]
     if limit >= 0:
         ret['limit'] = limit
-        if len(results) > limit:
-            results = results[0:limit]
     else:
         ret['limit'] = None
 
