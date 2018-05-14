@@ -5,7 +5,7 @@ import re
 import requests
 import sys
 from collections import OrderedDict
-from sqlalchemy import (Column, Table, Integer, ForeignKey, UniqueConstraint,
+from sqlalchemy import (Column, Integer, ForeignKey, UniqueConstraint,
                         String, UnicodeText, DateTime, create_engine, desc)
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
@@ -114,6 +114,7 @@ class Assoc():
         self.typ = typ
         self.act = act
 
+
 def build_facet_list():
     """ From the current DB state, pre build the response for requests to the
         /facets path.
@@ -173,6 +174,7 @@ def build_facet_list():
         ret['facets'].append(facet)
 
     return ret
+
 
 def get_referenced(json_dict, attrib):
     """ Get a value (of an attribute in a dict) that is not included in its
@@ -262,8 +264,8 @@ def build_canvas_doc(man, cur_can):
         for man_can in seq.get('canvases', []):
             # if man_can['@id'] in cur_can['@id']:
             # ↑ this selects wrong pages for ID schemes like
-            # http://dcollections.lib.keio.ac.jp/ [...] /NRE/110X-444-2-2/page1
-            # http://dcollections.lib.keio.ac.jp/ [...] /NRE/110X-444-2-2/page10
+            # http://dcollections.lib.keio.ac.jp/ [...] NRE/110X-444-2-2/page1
+            # http://dcollections.lib.keio.ac.jp/ [...] NRE/110X-444-2-2/page10
 
             # ↓ this should always find a match, right?
             if man_can['@id'] == cur_can['@id'].split('#')[0]:
@@ -329,6 +331,7 @@ def build_canvas_doc(man, cur_can):
 
     return doc
 
+
 def build_curation_doc(cur, activity, canvas_doc=None, cur_can_idx=None):
     """ Build a document (OrderedDict) with all information necessary to
         display a search result for a Curation.
@@ -368,12 +371,14 @@ def build_curation_doc(cur, activity, canvas_doc=None, cur_can_idx=None):
 
     return doc
 
+
 def enhance_top_meta_curation_doc(cur_doc, canvas_doc):
     """ Retroactively add missing information to a Curation search result
         associated with Curation top level metadata.
     """
 
     cur_doc['curationThumbnail'] = canvas_doc['canvasThumbnail']
+
 
 def build_qualifier_tuple(something):
     """ Given something, build a (<optional_qualifier>, <term>) tuple.
@@ -401,6 +406,7 @@ def build_qualifier_tuple(something):
             return (list(something.keys())[0], list(something.values())[0])
     # <?> → ('', <?>.__repr__())
     return ('', '{}'.format(something))
+
 
 def log(msg):
     """ Write a log message.
@@ -454,7 +460,8 @@ except requests.exceptions.RequestException as e:
     print('Could not access Activity Stream. ({})'.format(e))
     sys.exit(1)
 if resp.status_code != 200:
-    print('Could not access Activity Stream. (HTTP {})'.format(resp.status_code))
+    print('Could not access Activity Stream. (HTTP {})'.format(
+                                                            resp.status_code))
     sys.exit(1)
 as_oc = resp.json()
 log('start iterating over Activity Stream pages')
@@ -623,7 +630,7 @@ facet_list = build_facet_list()
 log('persisting facet list')
 db_entry = session.query(FacetList).first()
 if not db_entry:
-    db_entry = FacetList(json_string = json.dumps(facet_list))
+    db_entry = FacetList(json_string=json.dumps(facet_list))
 else:
     db_entry.json_string = json.dumps(facet_list)
 session.add(db_entry)

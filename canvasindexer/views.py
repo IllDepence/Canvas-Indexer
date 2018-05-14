@@ -2,10 +2,10 @@ import json
 import uuid
 import requests
 from collections import OrderedDict
-from flask import (abort, Blueprint, current_app, redirect, request, jsonify,
+from flask import (abort, Blueprint, current_app, redirect, request,
                    Response, url_for, render_template)
 from util.iiif import Curation as CurationObj
-from canvasindexer.models import (db, Term, Canvas, Curation, FacetList,
+from canvasindexer.models import (Term, Canvas, Curation, FacetList,
                                   TermCanvasAssoc, TermCurationAssoc)
 
 pd = Blueprint('pd', __name__)
@@ -53,7 +53,6 @@ def index():
                       can['canvasThumbnail'])
                       for can in canvas_dicts]
 
-
     status = ('&gt; Crawling canvas cutouts from: "{}".<br>&gt; Currently stor'
               'ing {} canvases associated with {} keywords.<br>&gt; Available '
               'keywords: "{}"'
@@ -66,6 +65,7 @@ def index():
     return render_template('index.html', canvases=canvas_digests,
                            status=status)
 
+
 @pd.route('/facets', methods=['GET'])
 def facets():
 
@@ -76,6 +76,7 @@ def facets():
     resp = Response(json.dumps(facet_list, indent=4))
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
 
 @pd.route('/api', methods=['GET'])
 def api():
@@ -106,6 +107,7 @@ def api():
         return abort(400, 'You can either set parameter "where" or set both pa'
                           'rameters "where_metadata_label" and "where_metadata'
                           '_value')
+    where_agent = request.args.get('where_agent', False)
     if where:
         fuzzy = True
     else:
@@ -137,6 +139,8 @@ def api():
     docs = Doc.query.join('terms', 'term')
     if vrom not in ['curation,canvas', 'canvas,curation']:
         docs = docs.filter(Assoc.metadata_type == vrom)
+    if where_agent:
+        docs = docs.filter(Assoc.actor == where_agent)
     if where:
         if fuzzy:
             docs = docs.filter(Term.term.ilike('%{}%'.format(where)))
@@ -162,7 +166,7 @@ def api():
             merged_results = []
             for r in all_results:
                 dupes = [d for d in all_results
-                                    if d['curationUrl'] == r['curationUrl']]
+                         if d['curationUrl'] == r['curationUrl']]
                 if len(dupes) == 2:
                     if r['curationUrl'] not in unique_cur_urls:
                         merged_results.append(combine(*dupes))
@@ -189,6 +193,7 @@ def api():
     resp = Response(json.dumps(ret, indent=4))
     resp.headers['Content-Type'] = 'application/json'
     return resp
+
 
 # @pd.route('/build/', methods=['POST'])
 def build():
