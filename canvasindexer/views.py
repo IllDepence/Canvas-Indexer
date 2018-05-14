@@ -136,25 +136,29 @@ def api():
         Assoc = TermCurationAssoc
 
     # filter records
-    docs = Doc.query.join('terms', 'term')
+    docs = Doc.query
+    assocs = Assoc.query
+    terms = Term.query
     if vrom not in ['curation,canvas', 'canvas,curation']:
-        docs = docs.filter(Assoc.metadata_type == vrom)
+        assocs = assocs.filter(Assoc.metadata_type == vrom)
     if where_agent:
-        docs = docs.filter(Assoc.actor == where_agent)
+        assocs = assocs.filter(Assoc.actor == where_agent)
     if where:
         if fuzzy:
-            docs = docs.filter(Term.term.ilike('%{}%'.format(where)))
+            terms = terms.filter(Term.term.ilike('%{}%'.format(where)))
         else:
-            docs = docs.filter(Term.term == where)
+            terms = terms.filter(Term.term == where)
     elif where_metadata_label:
         if fuzzy:
-            docs = docs.filter(Term.term.ilike('%{}%'.format(
-                                                        where_metadata_value
-                                                            )),
-                               Term.qualifier == where_metadata_label)
+            terms = terms.filter(Term.term.ilike('%{}%'.format(
+                                                          where_metadata_value
+                                                              )),
+                                 Term.qualifier == where_metadata_label)
         else:
-            docs = docs.filter(Term.term == where_metadata_value,
-                               Term.qualifier == where_metadata_label)
+            terms = terms.filter(Term.term == where_metadata_value,
+                                 Term.qualifier == where_metadata_label)
+
+    docs = docs.join(assocs).join(terms).all()
 
     if docs:
         all_results = [json.loads(doc.json_string,
