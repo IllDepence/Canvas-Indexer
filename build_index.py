@@ -467,6 +467,8 @@ as_oc = resp.json()
 log('start iterating over Activity Stream pages')
 as_ocp = get_referenced(as_oc, 'last')
 last_crawl = session.query(CrawlLog).order_by(desc(CrawlLog.log_id)).first()
+new_canvases = 0
+new_activity = False
 # for all AS pages
 while True:
     # for all AC items
@@ -479,6 +481,7 @@ while True:
         if (not last_crawl or activity_end_time > last_crawl.datetime) and \
                 activity['type'] == 'Create' and \
                 activity['object']['@type'] == 'cr:Curation':
+            new_activity = True
             log('retrieving curation {}'.format(activity['object']['@id']))
             cur = get_referenced(activity, 'object')
             cur_top_doc = build_curation_doc(cur, activity)
@@ -538,6 +541,7 @@ while True:
                                                  cur_can_idx)
                     # canvas
                     if can_uri not in canvas_uri_dict:
+                        new_canvases += 1
                         can = Canvas(canvas_uri=can_uri,
                                      json_string=json.dumps(can_doc))
                         session.add(can)
@@ -620,18 +624,19 @@ while True:
         break
     as_ocp = get_referenced(as_ocp, 'prev')
 
-# # persist crawl log
-# log = CrawlLog(new_canvases=new_canvases)
-# session.add(log)
-# session.commit()
-log('generating facet list')
-# build and persist facet list
-facet_list = build_facet_list()
-log('persisting facet list')
-db_entry = session.query(FacetList).first()
-if not db_entry:
-    db_entry = FacetList(json_string=json.dumps(facet_list))
-else:
-    db_entry.json_string = json.dumps(facet_list)
-session.add(db_entry)
+# persist crawl log
+crawl_log = CrawlLog(new_canvases=new_canvases)
+session.add(crawl_log)
 session.commit()
+if new_activity:
+    log('generating facet list')
+    # build and persist facet list
+    facet_list = build_facet_list()
+    log('persisting facet list')
+    db_entry = session.query(FacetList).first()
+    if not db_entry:
+        db_entry = FacetList(json_string=json.dumps(facet_list))
+    else:
+        db_entry.json_string = json.dumps(facet_list)
+    session.add(db_entry)
+    session.commit()
