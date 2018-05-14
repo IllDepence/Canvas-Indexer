@@ -165,6 +165,18 @@ def api():
             unique_cur_urls = []
             merged_results = []
             for r in all_results:
+                if r['curationLabel'] == ('A mere container for machine tagged'
+                                          ' cavanses'):
+                    # FIXME: dirty solution to keep "container" curations (that
+                    #        only contain canvases + machine generated tags)
+                    #        out of search results
+                    #        using canvases directly doesn't work here because
+                    #        the original canvas url needs to be preserved for
+                    #        associating the tags with the canvas
+                    #
+                    #        solution: use ranges an containers (requires some
+                    #        work in the crawling process)
+                    continue
                 dupes = [d for d in all_results
                          if d['curationUrl'] == r['curationUrl']]
                 if len(dupes) == 2:
