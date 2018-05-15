@@ -299,8 +299,18 @@ def build_canvas_doc(man, cur_can):
                     quality = quality_options[0]
                 else:
                     quality = 'default'
-                img_url = '{}{}'.format(info_dict.get('@id'),
-                                        '/full/full/0/{}.jpg'.format(quality))
+                formad = None
+                formad_options = info_dict.get('formats', [])
+                if 'jpg' in formad_options:
+                    formad = 'jpg'
+                elif len(formad_options) > 0 and \
+                     type(formad_options[0]) == str:
+                    formad = formad_options[0]
+                else:
+                    formad = 'jpg'
+                img_url = '{}/full/full/0/{}.{}'.format(info_dict.get('@id'),
+                                                        quality,
+                                                        formad)
 
                 # > canvasId
                 doc['canvasId'] = man_can['@id']
