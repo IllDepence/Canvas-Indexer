@@ -131,8 +131,8 @@ def build_facet_list():
         if term.term not in facet_map[term.qualifier]:
             facet_map[term.qualifier].append(term.term)
 
-    ret = OrderedDict()
-    ret['facets'] = []
+    # create
+    pre_facets = {}
     for label, vals in facet_map.items():
         assocs = session.query(TermCanvasAssoc).join(Term)
         assocs = assocs.filter(TermCanvasAssoc.metadata_type == 'canvas',
@@ -140,6 +140,7 @@ def build_facet_list():
                                Term.qualifier == label).all()
         facet = OrderedDict()
         facet['label'] = label
+        # create
         facet['value'] = []
         for val in vals:
             unkown_count = 0
@@ -164,16 +165,37 @@ def build_facet_list():
                 entry = OrderedDict()
                 entry['label'] = val
                 entry['value'] = human_count
-                facet['value'].append(entry)
                 entry['agent'] = 'human'
+                facet['value'].append(entry)
             # software actor
             if software_count > 0:
                 entry = OrderedDict()
                 entry['label'] = val
                 entry['value'] = software_count
-                facet['value'].append(entry)
                 entry['agent'] = 'software'
-        ret['facets'].append(facet)
+                facet['value'].append(entry)
+        # sort
+        facet['value'] = sorted(facet['value'],
+                                key=lambda k: k['value'],
+                                reverse=True)
+        pre_facets[label] = facet
+
+    # order
+    facets = []
+    sort_front_labels = []
+    sort_back_labels = ['tag']
+    for l in sort_front_labels:
+        if l in pre_facets:
+            facets.append(pre_facets[l])
+    for label, facet in pre_facets.items():
+        if label not in sort_front_labels + sort_back_labels:
+            facets.append(facet)
+    for l in sort_back_labels:
+        if l in pre_facets:
+            facets.append(pre_facets[l])
+
+    ret = {}
+    ret['facets'] = facets
 
     return ret
 
