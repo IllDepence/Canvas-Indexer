@@ -24,18 +24,30 @@ class Cfg():
     def db_uri(self):
         return self.cfg['db_uri']
 
-    # def curation_upload_url(self):
-    #     return self.cfg['curation_upload_url']
-
     def as_sources(self):
         return self.cfg['as_sources']
+
+    def facet_sort_front(self):
+        return self.cfg['facet_sort_front']
+
+    def facet_sort_back(self):
+        return self.cfg['facet_sort_back']
+
+    def facet_inner_sort_freqency(self):
+        return self.cfg['facet_inner_sort_freqency']
+
+    def facet_inner_sort_alphanum(self):
+        return self.cfg['facet_inner_sort_alphanum']
 
     def _get_default_config(self):
         # later read from config file
         cfg = {}
         cfg['db_uri'] = 'sqlite:////tmp/ci_tmp.db'
-        # cfg['curation_upload_url'] = 'http://localhost:5000/api'
         cfg['as_sources'] = []
+        cfg['facet_sort_front'] = []
+        cfg['facet_sort_back'] = []
+        cfg['facet_inner_sort_freqency'] = []
+        cfg['facet_inner_sort_alphanum'] = []
         return cfg
 
     def _parse_config(self, cp):
@@ -51,15 +63,20 @@ class Cfg():
         if 'shared' in cp.sections():
             if cp['shared'].get('db_uri'):
                 cfg['db_uri'] = cp['shared'].get('db_uri')
-        # if 'webapi' in cp.sections():
-        #     if cp['webapi'].get('curation_upload_url'):
-        #         cfg['curation_upload_url'] = cp['webapi'].get(
-        #                                                'curation_upload_url')
         if 'crawler' in cp.sections():
             if cp['crawler'].get('as_sources'):
                 as_sources = cp['crawler'].get('as_sources')
                 cfg['as_sources'] = [s.strip() for s in as_sources.split(',')
                                      if len(s) > 0]
+        if 'api' in cp.sections():
+            sort_options = ['facet_sort_front',
+                            'facet_sort_back',
+                            'facet_inner_sort_freqency',
+                            'facet_inner_sort_alphanum']
+            for so in sort_options:
+                if cp['api'].get(so):
+                    val = cp['api'].get(so)
+                    cfg[so] = [o.strip() for o in val.split(',') if len(o) > 0]
 
         if fails:
             fail = '\n'.join(fails)

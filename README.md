@@ -14,6 +14,10 @@ section | key | default | explanation
 ------- | --- | ------- | -----------
 shared | db\_uri | sqlite:////tmp/ci\_tmp.db | a [SQLAlchemy database URI](http://docs.sqlalchemy.org/en/latest/core/engines.html#database-urls) (file system paths have to be absolute)
 crawler | as\_sources | [] | comma seperated list of links to [Activity Streams](https://www.w3.org/TR/activitystreams-core/) in form of OrderedCollections
+api | facet\_sort\_front | [] | comma seperated list defining the beginning of the list returned for the `/facets` endpoint
+&zwnj; | facet\_sort\_back | [] | comma seperated list defining the end of the list returned for the `/facets` endpoint
+&zwnj; | facet\_inner\_sort\_freqency | [] | comma seperated list of facets to be sorted by frequency
+&zwnj; | facet\_inner\_sort\_alphanum | [] | comma seperated list of facets to be sorted alphanumerically
 
 ## Run
 
@@ -22,7 +26,7 @@ crawler | as\_sources | [] | comma seperated list of links to [Activity Streams]
 
 ## API
 
-path: `{base_url}/api`  
+**path: `{base_url}/api`**  
 arguments:
 
 arg | default | explanation
@@ -36,6 +40,10 @@ start | `0` | 0 based index from which to start listing results from the list of
 limit | `null` meaning no limit | limit the number of results being returned
 
 example: `{base_url}/api?select=canvas&from=canvas,curation&where=face`
+
+
+**path: `{base_url}/facets`**  
+returns a pre generated overview of the indexed metadata facets
 
 - - -
 

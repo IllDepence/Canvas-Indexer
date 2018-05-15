@@ -175,15 +175,23 @@ def build_facet_list():
                 entry['agent'] = 'software'
                 facet['value'].append(entry)
         # sort
-        facet['value'] = sorted(facet['value'],
-                                key=lambda k: k['value'],
-                                reverse=True)
+        if label in cfg.facet_inner_sort_alphanum():
+            facet['value'] = sorted(facet['value'],
+                                    key=lambda k: k['label'],
+                                    reverse=False)
+        elif label in cfg.facet_inner_sort_freqency() or True:
+            # currently the default                       ↑
+            facet['value'] = sorted(facet['value'],
+                                    key=lambda k: k['value'],
+                                    reverse=True)
+
         pre_facets[label] = facet
+
 
     # order
     facets = []
-    sort_front_labels = []
-    sort_back_labels = ['tag']
+    sort_front_labels = cfg.facet_sort_front()
+    sort_back_labels = cfg.facet_sort_back()
     for l in sort_front_labels:
         if l in pre_facets:
             facets.append(pre_facets[l])
@@ -627,9 +635,9 @@ while True:
                         top_cur.json_string = json.dumps(cur_top_doc)
                         top_doc_has_thumbnail = True
                         # can assoc
-                        if top_term not in term_can_assoc_list:
-                            tcaa_key = (term_tup_dict[top_term],
-                                        canvas_uri_dict[can_uri])
+                        tcaa_key = (term_tup_dict[top_term],
+                                    canvas_uri_dict[can_uri])
+                        if tcaa_key not in term_can_assoc_list:
                             term_can_assoc_list.append(tcaa_key)
                             assoc = TermCanvasAssoc(term_id=top_term_id,
                                                     canvas_id=can_id,
