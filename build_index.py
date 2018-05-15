@@ -85,7 +85,9 @@ class Curation(Base):
 class CrawlLog(Base):
     __tablename__ = 'crawllog'
     log_id = Column(Integer(), autoincrement=True, primary_key=True)
-    datetime = Column(DateTime(timezone=True), server_default=func.now())
+    # datetime = Column(DateTime(timezone=True), server_default=func.now())
+    # ↓ saved as isoformat string to ease integration with JSONkeeper AS
+    datetime = Column(UnicodeText())
     new_canvases = Column(Integer())
 
 
@@ -414,12 +416,30 @@ def build_qualifier_tuple(something):
                 return (label.strip(),
                         ', '.join([x.__repr__() for x in value]))
             else:
-                return (label, value.__repr__())
+                return (label.strip(), value.__repr__())
         else:
             # {'foo': 'bar', ...} → ('foo', bar')
             return (list(something.keys())[0], list(something.values())[0])
     # <?> → ('', <?>.__repr__())
     return ('', '{}'.format(something))
+
+
+def merge_iiif_doc_metadata(old_doc, new_doc):
+    """ Given two IIIF documents (e.g. Canvas) as dictionaries, merge the
+        contents of their `metadata` attribute on the root level.
+        This assumes metadata to be a list of dictionaries with `label` and
+        `value` keys as recommended in iiif.io/api/presentation/2.1/#metadata.
+    """
+
+    old_meta = old_doc.get('metadata', [])
+    if type(old_meta) != list:
+        old_meta = []
+    new_meta = new_doc.get('metadata', [])
+    if type(new_meta) != list:
+        new_meta = []
+    result_doc = old_doc
+    result_doc['metadata'] = old_meta + new_meta
+    return result_doc
 
 
 def log(msg):
@@ -491,8 +511,12 @@ while True:
         log('going through {} item {}'.format(activity['type'],
                                               activity['id']))
         activity_end_time = dateutil.parser.parse(activity['endTime'])
+        if last_crawl:
+            last_crawl_time = dateutil.parser.parse(last_crawl.datetime)
+        else:
+            last_crawl_time = datetime.datetime.fromtimestamp(0).isoformat()
         # if we haven't seen it yet and it's a Curation create
-        if (not last_crawl or activity_end_time > last_crawl.datetime) and \
+        if (not last_crawl or activity_end_time > last_crawl_time) and \
                 activity['type'] == 'Create' and \
                 activity['object']['@type'] == 'cr:Curation':
             new_activity = True
@@ -523,6 +547,7 @@ while True:
                     curation_uri_dict[top_cur_uri] = top_cur.id
                     top_cur_id = top_cur.id
                 else:
+                    top_cur = None
                     top_cur_id = curation_uri_dict[top_cur_uri]
                 # cur assoc
                 tcua_key = (term_tup_dict[top_term],
@@ -564,8 +589,17 @@ while True:
                         can_id = can.id
                     else:
                         can_id = canvas_uri_dict[can_uri]
+                        # extend the Canvas' metadata
+                        can = session.query(Canvas).filter(
+                                        Canvas.canvas_uri == can_uri).first()
+                        db_can = json.loads(can.json_string)
+                        merged_doc = merge_iiif_doc_metadata(db_can, cur_can)
+                        can.json_string = json.dumps(merged_doc)
+                        session.add(can)
+                        session.flush()
                     # still curation metadata
-                    if found_top_metadata and not top_doc_has_thumbnail:
+                    if found_top_metadata and top_cur and \
+                            not top_doc_has_thumbnail:
                         # enhance (cur metadata-) cur
                         enhance_top_meta_curation_doc(cur_top_doc, can_doc)
                         top_cur.json_string = json.dumps(cur_top_doc)
@@ -639,7 +673,8 @@ while True:
     as_ocp = get_referenced(as_ocp, 'prev')
 
 # persist crawl log
-crawl_log = CrawlLog(new_canvases=new_canvases)
+crawl_log = CrawlLog(new_canvases=new_canvases,
+                     datetime=datetime.datetime.now().isoformat())
 session.add(crawl_log)
 session.commit()
 if new_activity:
