@@ -396,19 +396,23 @@ def build_qualifier_tuple(something):
 
     if type(something) == str:
         # 'foo' → ('', 'foo')
-        return ('', something)
+        return ('', something.strip())
     elif type(something) in [tuple, list]:
         # ['foo', 'bar', ...] / ('foo', 'bar', ...) → ('foo', 'bar')
-        return (something[0], something[1])
+        label = something[0]
+        value = something[1]
+        if type(label) == str and type(value) == str:
+            return (something[0].strip(), something[1].strip())
     elif type(something) == dict:
         label = something.get('label')
         value = something.get('value')
         if (label == '' or label) and (value == '' or value):
             # {'label': 'foo', 'value': 'bar', ...} → ('foo', bar')
             if type(value) == str:
-                return (label, value)
+                return (label.strip(), value.strip())
             elif type(value) in [tuple, list]:
-                return (label, ', '.join([x.__repr__() for x in value]))
+                return (label.strip(),
+                        ', '.join([x.__repr__() for x in value]))
             else:
                 return (label, value.__repr__())
         else:
