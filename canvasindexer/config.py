@@ -33,8 +33,8 @@ class Cfg():
     def facet_sort_back(self):
         return self.cfg['facet_sort_back']
 
-    def facet_inner_sort_freqency(self):
-        return self.cfg['facet_inner_sort_freqency']
+    def facet_inner_sort_frequency(self):
+        return self.cfg['facet_inner_sort_frequency']
 
     def facet_inner_sort_alphanum(self):
         return self.cfg['facet_inner_sort_alphanum']
@@ -46,7 +46,7 @@ class Cfg():
         cfg['as_sources'] = []
         cfg['facet_sort_front'] = []
         cfg['facet_sort_back'] = []
-        cfg['facet_inner_sort_freqency'] = []
+        cfg['facet_inner_sort_frequency'] = []
         cfg['facet_inner_sort_alphanum'] = []
         return cfg
 
@@ -71,7 +71,7 @@ class Cfg():
         if 'api' in cp.sections():
             sort_options = ['facet_sort_front',
                             'facet_sort_back',
-                            'facet_inner_sort_freqency',
+                            'facet_inner_sort_frequency',
                             'facet_inner_sort_alphanum']
             for so in sort_options:
                 if cp['api'].get(so):

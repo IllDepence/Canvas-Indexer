@@ -16,7 +16,7 @@ shared | db\_uri | sqlite:////tmp/ci\_tmp.db | a [SQLAlchemy database URI](http:
 crawler | as\_sources | [] | comma seperated list of links to [Activity Streams](https://www.w3.org/TR/activitystreams-core/) in form of OrderedCollections
 api | facet\_sort\_front | [] | comma seperated list defining the beginning of the list returned for the `/facets` endpoint
 &zwnj; | facet\_sort\_back | [] | comma seperated list defining the end of the list returned for the `/facets` endpoint
-&zwnj; | facet\_inner\_sort\_freqency | [] | comma seperated list of facets to be sorted by frequency
+&zwnj; | facet\_inner\_sort\_frequency | [] | comma seperated list of facets to be sorted by frequency
 &zwnj; | facet\_inner\_sort\_alphanum | [] | comma seperated list of facets to be sorted alphanumerically
 
 ## Run

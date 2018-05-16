@@ -179,7 +179,7 @@ def build_facet_list():
             facet['value'] = sorted(facet['value'],
                                     key=lambda k: k['label'],
                                     reverse=False)
-        elif label in cfg.facet_inner_sort_freqency() or True:
+        elif label in cfg.facet_inner_sort_frequency() or True:
             # currently the default                       ↑
             facet['value'] = sorted(facet['value'],
                                     key=lambda k: k['value'],
@@ -469,6 +469,9 @@ def merge_iiif_doc_metadata(old_doc, new_doc):
         new_meta = []
     result_doc = old_doc
     result_doc['metadata'] = old_meta + new_meta
+    # TODO: apply facet_sort_* stuff here as well
+    #           (then mby change setting name?)
+    #       also check for exact duplicates
     return result_doc
 
 
