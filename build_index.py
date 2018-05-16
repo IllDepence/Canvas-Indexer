@@ -625,6 +625,9 @@ while True:
             # curation metadata
             for md in cur.get('metadata', []):
                 top_term = build_qualifier_tuple(md)
+                if not top_term[1]:
+                    # don't allow empty values
+                    continue
                 # term
                 if top_term not in term_tup_dict:
                     term = Term(term=top_term[1], qualifier=top_term[0])
@@ -714,8 +717,11 @@ while True:
 
                     # canvas metadata
                     for md in cur_can.get('metadata', []):
-                        # term
                         can_term = build_qualifier_tuple(md)
+                        if not can_term[1]:
+                            # don't allow empty values
+                            continue
+                        # term
                         if can_term not in term_tup_dict:
                             term = Term(term=can_term[1],
                                         qualifier=can_term[0])
