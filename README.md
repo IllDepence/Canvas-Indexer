@@ -18,7 +18,7 @@ api | facet\_label\_sort\_top | [] | comma seperated list defining the beginning
 &zwnj; | facet\_label\_sort\_bottom | [] | comma seperated list defining the end of the list returned for the `/facets` endpoint
 &zwnj; | facet\_value\_sort\_frequency | [] | comma seperated list of facets to be sorted by frequency
 &zwnj; | facet\_value\_sort\_alphanum | [] | comma seperated list of facets to be sorted alphanumerically
-facet\_value\_sort\_custom\_<name> | label | &zwnj; | facet label for which a custom order is defined
+facet\_value\_sort\_custom\_&lt;name&gt; | label | &zwnj; | facet label for which a custom order is defined
 &zwnj; | sort\_top | &zwnj; | comma seperated list defining the beginning
 &zwnj; | sort\_bottom | &zwnj; | comma seperated list defining the end
 
