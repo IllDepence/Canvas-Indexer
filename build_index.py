@@ -456,6 +456,12 @@ def enhance_top_meta_curation_doc(cur_doc, canvas_doc):
 
 def build_qualifier_tuple(something):
     """ Given something, build a (<optional_qualifier>, <term>) tuple.
+
+        This function is written to be able to deal with a wide range of
+        metadata. This should hold throughout the indexing process. Other parts
+        of the code, however, discard metadata that is not a list of dicts with
+        a label and value (e.g. the preservation of metadata in result
+        documents).
     """
 
     if type(something) == str:
@@ -499,11 +505,30 @@ def merge_iiif_doc_metadata(old_doc, new_doc):
     new_meta = new_doc.get('metadata', [])
     if type(new_meta) != list:
         new_meta = []
+    # clean
+    result_meta = []
+    seen = []
+    for meta in old_meta + new_meta:
+        if type(meta) != dict:
+            continue
+        label = meta.get('label')
+        value = meta.get('value')
+        if not label or not value:
+            continue
+        if (label, value) not in seen:
+            result_meta.append(meta)
+            seen.append((label, value))
+    # sort
+    dictionary = {}
+    for item in result_meta:
+        dictionary[item['label']] = item
+    result_meta = custom_sort(dictionary,
+                              cfg.facet_label_sort_top(),
+                              cfg.facet_label_sort_bottom())
+    # assemble
     result_doc = old_doc
-    result_doc['metadata'] = old_meta + new_meta
-    # TODO: apply facet_sort_* stuff here as well
-    #           (then mby change setting name?)
-    #       also check for exact duplicates
+    result_doc['metadata'] = result_meta
+
     return result_doc
 
 
