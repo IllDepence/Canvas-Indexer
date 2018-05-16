@@ -175,18 +175,18 @@ def build_facet_list():
                 entry['agent'] = 'software'
                 facet['value'].append(entry)
         # sort
-        if label in cfg.facet_inner_sort_alphanum():
+        if label in cfg.facet_value_sort_alphanum():
             facet['value'] = sorted(facet['value'],
                                     key=lambda k: k['label'],
                                     reverse=False)
-        elif label in cfg.custom_inner_sorts():
-            front_labels = cfg.custom_inner_sorts()[label]['sort_front']
-            back_labels = cfg.custom_inner_sorts()[label]['sort_back']
+        elif label in cfg.custom_value_sorts():
+            top_labels = cfg.custom_value_sorts()[label]['sort_top']
+            bottom_labels = cfg.custom_value_sorts()[label]['sort_bottom']
             dictionary = {}
             for item in facet['value']:
                 dictionary[item['label']] = item
-            facet['value'] = custom_sort(dictionary, front_labels, back_labels)
-        elif label in cfg.facet_inner_sort_frequency() or True:
+            facet['value'] = custom_sort(dictionary, top_labels, bottom_labels)
+        elif label in cfg.facet_value_sort_frequency() or True:
             # default                                      ↑
             facet['value'] = sorted(facet['value'],
                                     key=lambda k: k['value'],
@@ -197,8 +197,8 @@ def build_facet_list():
 
     # order
     facets = custom_sort(pre_facets,
-                         cfg.facet_sort_front(),
-                         cfg.facet_sort_back())
+                         cfg.facet_label_sort_top(),
+                         cfg.facet_label_sort_bottom())
 
     ret = {}
     ret['facets'] = facets
@@ -206,7 +206,7 @@ def build_facet_list():
     return ret
 
 
-def custom_sort(dictionary, sort_front_labels, sort_back_labels):
+def custom_sort(dictionary, sort_top_labels, sort_bottom_labels):
     """ Given a dictionary in the form of
 
             {'<a_label>': {
@@ -216,25 +216,25 @@ def custom_sort(dictionary, sort_front_labels, sort_back_labels):
                           ...
             }
 
-        and two lists (for front and back)
+        and two lists (for top and bottom)
 
             ['<a_label', 'c_label', 'b_label', ...]
 
         return a list of the dictonaries values ordered
 
-            <all front items found in dictionary, in the given order>
+            <all top items found in dictionary, in the given order>
             <others>
-            <all back items found in dictionary, in the given order>
+            <all bottom items found in dictionary, in the given order>
     """
 
     ret = []
-    for l in sort_front_labels:
+    for l in sort_top_labels:
         if l in dictionary:
             ret.append(dictionary[l])
     for label, facet in dictionary.items():
-        if label not in sort_front_labels + sort_back_labels:
+        if label not in sort_top_labels + sort_bottom_labels:
             ret.append(facet)
-    for l in sort_back_labels:
+    for l in sort_bottom_labels:
         if l in dictionary:
             ret.append(dictionary[l])
     return ret

@@ -27,31 +27,31 @@ class Cfg():
     def as_sources(self):
         return self.cfg['as_sources']
 
-    def facet_sort_front(self):
-        return self.cfg['facet_sort_front']
+    def facet_label_sort_top(self):
+        return self.cfg['facet_label_sort_top']
 
-    def facet_sort_back(self):
-        return self.cfg['facet_sort_back']
+    def facet_label_sort_bottom(self):
+        return self.cfg['facet_label_sort_bottom']
 
-    def facet_inner_sort_frequency(self):
-        return self.cfg['facet_inner_sort_frequency']
+    def facet_value_sort_frequency(self):
+        return self.cfg['facet_value_sort_frequency']
 
-    def facet_inner_sort_alphanum(self):
-        return self.cfg['facet_inner_sort_alphanum']
+    def facet_value_sort_alphanum(self):
+        return self.cfg['facet_value_sort_alphanum']
 
-    def custom_inner_sorts(self):
-        return self.cfg['custom_inner_sorts']
+    def custom_value_sorts(self):
+        return self.cfg['custom_value_sorts']
 
     def _get_default_config(self):
         # later read from config file
         cfg = {}
         cfg['db_uri'] = 'sqlite:////tmp/ci_tmp.db'
         cfg['as_sources'] = []
-        cfg['facet_sort_front'] = []
-        cfg['facet_sort_back'] = []
-        cfg['facet_inner_sort_frequency'] = []
-        cfg['facet_inner_sort_alphanum'] = []
-        cfg['custom_inner_sorts'] = {}
+        cfg['facet_label_sort_top'] = []
+        cfg['facet_label_sort_bottom'] = []
+        cfg['facet_value_sort_frequency'] = []
+        cfg['facet_value_sort_alphanum'] = []
+        cfg['custom_value_sorts'] = {}
         return cfg
 
     def _parse_config(self, cp):
@@ -74,28 +74,28 @@ class Cfg():
                                      if len(s) > 0]
         # Sorting of API responses
         if 'api' in cp.sections():
-            sort_options = ['facet_sort_front',
-                            'facet_sort_back',
-                            'facet_inner_sort_frequency',
-                            'facet_inner_sort_alphanum']
+            sort_options = ['facet_label_sort_top',
+                            'facet_label_sort_bottom',
+                            'facet_value_sort_frequency',
+                            'facet_value_sort_alphanum']
             for so in sort_options:
                 if cp['api'].get(so):
                     val = cp['api'].get(so)
                     cfg[so] = [o.strip() for o in val.split(',') if len(o) > 0]
         for sec_name in cp.sections():
-            if 'custom_inner_sort_' in sec_name:
+            if 'facet_value_sort_custom_' in sec_name:
                 custom_sort = {}
                 label = cp[sec_name].get('label')
-                sort_front = cp[sec_name].get('sort_front', '')
-                sort_front = [o.strip() for o in sort_front.split(',')
+                sort_top = cp[sec_name].get('sort_top', '')
+                sort_top = [o.strip() for o in sort_top.split(',')
                                                                 if len(o) > 0]
-                sort_back = cp[sec_name].get('sort_back', '')
-                sort_back = [o.strip() for o in sort_back.split(',')
+                sort_bottom = cp[sec_name].get('sort_bottom', '')
+                sort_bottom = [o.strip() for o in sort_bottom.split(',')
                                                                 if len(o) > 0]
-                if label and len(sort_front + sort_back) > 0:
-                    custom_sort['sort_front'] = sort_front
-                    custom_sort['sort_back'] = sort_back
-                    cfg['custom_inner_sorts'][label] = custom_sort
+                if label and len(sort_top + sort_bottom) > 0:
+                    custom_sort['sort_top'] = sort_top
+                    custom_sort['sort_bottom'] = sort_bottom
+                    cfg['custom_value_sorts'][label] = custom_sort
 
         if fails:
             fail = '\n'.join(fails)
