@@ -179,8 +179,15 @@ def build_facet_list():
             facet['value'] = sorted(facet['value'],
                                     key=lambda k: k['label'],
                                     reverse=False)
+        elif label in cfg.custom_inner_sorts():
+            front_labels = cfg.custom_inner_sorts()[label]['sort_front']
+            back_labels = cfg.custom_inner_sorts()[label]['sort_back']
+            dictionary = {}
+            for item in facet['value']:
+                dictionary[item['label']] = item
+            facet['value'] = custom_sort(dictionary, front_labels, back_labels)
         elif label in cfg.facet_inner_sort_frequency() or True:
-            # currently the default                       ↑
+            # default                                      ↑
             facet['value'] = sorted(facet['value'],
                                     key=lambda k: k['value'],
                                     reverse=True)
@@ -189,22 +196,47 @@ def build_facet_list():
 
 
     # order
-    facets = []
-    sort_front_labels = cfg.facet_sort_front()
-    sort_back_labels = cfg.facet_sort_back()
-    for l in sort_front_labels:
-        if l in pre_facets:
-            facets.append(pre_facets[l])
-    for label, facet in pre_facets.items():
-        if label not in sort_front_labels + sort_back_labels:
-            facets.append(facet)
-    for l in sort_back_labels:
-        if l in pre_facets:
-            facets.append(pre_facets[l])
+    facets = custom_sort(pre_facets,
+                         cfg.facet_sort_front(),
+                         cfg.facet_sort_back())
 
     ret = {}
     ret['facets'] = facets
 
+    return ret
+
+
+def custom_sort(dictionary, sort_front_labels, sort_back_labels):
+    """ Given a dictionary in the form of
+
+            {'<a_label>': {
+                          'label': '<a_label>'
+                          'value': '<a_value>'
+                          },
+                          ...
+            }
+
+        and two lists (for front and back)
+
+            ['<a_label', 'c_label', 'b_label', ...]
+
+        return a list of the dictonaries values ordered
+
+            <all front items found in dictionary, in the given order>
+            <others>
+            <all back items found in dictionary, in the given order>
+    """
+
+    ret = []
+    for l in sort_front_labels:
+        if l in dictionary:
+            ret.append(dictionary[l])
+    for label, facet in dictionary.items():
+        if label not in sort_front_labels + sort_back_labels:
+            ret.append(facet)
+    for l in sort_back_labels:
+        if l in dictionary:
+            ret.append(dictionary[l])
     return ret
 
 

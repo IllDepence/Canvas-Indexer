@@ -39,6 +39,9 @@ class Cfg():
     def facet_inner_sort_alphanum(self):
         return self.cfg['facet_inner_sort_alphanum']
 
+    def custom_inner_sorts(self):
+        return self.cfg['custom_inner_sorts']
+
     def _get_default_config(self):
         # later read from config file
         cfg = {}
@@ -48,6 +51,7 @@ class Cfg():
         cfg['facet_sort_back'] = []
         cfg['facet_inner_sort_frequency'] = []
         cfg['facet_inner_sort_alphanum'] = []
+        cfg['custom_inner_sorts'] = {}
         return cfg
 
     def _parse_config(self, cp):
@@ -68,6 +72,7 @@ class Cfg():
                 as_sources = cp['crawler'].get('as_sources')
                 cfg['as_sources'] = [s.strip() for s in as_sources.split(',')
                                      if len(s) > 0]
+        # Sorting of API responses
         if 'api' in cp.sections():
             sort_options = ['facet_sort_front',
                             'facet_sort_back',
@@ -77,6 +82,20 @@ class Cfg():
                 if cp['api'].get(so):
                     val = cp['api'].get(so)
                     cfg[so] = [o.strip() for o in val.split(',') if len(o) > 0]
+        for sec_name in cp.sections():
+            if 'custom_inner_sort_' in sec_name:
+                custom_sort = {}
+                label = cp[sec_name].get('label')
+                sort_front = cp[sec_name].get('sort_front', '')
+                sort_front = [o.strip() for o in sort_front.split(',')
+                                                                if len(o) > 0]
+                sort_back = cp[sec_name].get('sort_back', '')
+                sort_back = [o.strip() for o in sort_back.split(',')
+                                                                if len(o) > 0]
+                if label and len(sort_front + sort_back) > 0:
+                    custom_sort['sort_front'] = sort_front
+                    custom_sort['sort_back'] = sort_back
+                    cfg['custom_inner_sorts'][label] = custom_sort
 
         if fails:
             fail = '\n'.join(fails)
