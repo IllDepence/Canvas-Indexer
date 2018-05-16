@@ -519,12 +519,19 @@ def merge_iiif_doc_metadata(old_doc, new_doc):
             result_meta.append(meta)
             seen.append((label, value))
     # sort
-    dictionary = {}
-    for item in result_meta:
-        dictionary[item['label']] = item
-    result_meta = custom_sort(dictionary,
-                              cfg.facet_label_sort_top(),
-                              cfg.facet_label_sort_bottom())
+    sort_top_labels = cfg.facet_label_sort_top()
+    sort_bottom_labels = cfg.facet_label_sort_bottom()
+    top_bin = []
+    center_bin = []
+    bottom_bin = []
+    for meta in result_meta:
+        if meta['label'] in sort_top_labels:
+            top_bin.append(meta)
+        elif meta['label'] in sort_bottom_labels:
+            bottom_bin.append(meta)
+        else:
+            center_bin.append(meta)
+    result_meta = top_bin + center_bin + bottom_bin
     # assemble
     result_doc = old_doc
     result_doc['metadata'] = result_meta
