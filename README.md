@@ -23,6 +23,16 @@ facet\_value\_sort\_custom\_&lt;name&gt; | label | &zwnj; | facet label for whic
 &zwnj; | sort\_bottom | &zwnj; | comma seperated list defining the end
 
 ## Run
+### Crawler
+
+    $ python3 build_index.py
+
+#### Notes
+
+* The crawler is designed to be run periodically. On its first run it will go through an Activity Stream in its entirety, subsequent runs will only regard Activities that occured *after* the previous run.
+* It its current state Canvas Indexer only looks for Canvases within cr:Curation\* type documents. This can, however, easily be expanded/changed to sc:Manifests.<br>\*`http://codh.rois.ac.jp/iiif/curation/1#Curation`
+
+### Search API
 
     $ source venv/bin/activate
     $ python3 run.py [debug]
@@ -54,3 +64,7 @@ returns a pre generated overview of the indexed metadata facets
 ## Logo
 The Canvas Indexer logo uses image content from [絵本花葛蘿](http://codh.rois.ac.jp/pmjt/book/200015291/) in the [日本古典籍データセット（国文研所蔵）](http://codh.rois.ac.jp/pmjt/book/) provided by the [Center for Open Data in the Humanities](http://codh.rois.ac.jp/), used under [CC-BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/).
 The Canvas Indexer logo is licensed under [CC-BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/) by Tarek Saier.
+
+## Support
+Sponsored by the National Institute of Informatics.  
+Supported by the Center for Open Data in the Humanities, Joint Support-Center for Data Science Research, Research Organization of Information and Systems.
