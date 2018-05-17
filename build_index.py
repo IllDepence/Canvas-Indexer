@@ -179,18 +179,22 @@ def build_facet_list():
             facet['value'] = sorted(facet['value'],
                                     key=lambda k: k['label'],
                                     reverse=False)
-        elif label in cfg.custom_value_sorts():
-            top_labels = cfg.custom_value_sorts()[label]['sort_top']
-            bottom_labels = cfg.custom_value_sorts()[label]['sort_bottom']
-            dictionary = {}
-            for item in facet['value']:
-                dictionary[item['label']] = item
-            facet['value'] = custom_sort(dictionary, top_labels, bottom_labels)
         elif label in cfg.facet_value_sort_frequency() or True:
             # default                                      ↑
             facet['value'] = sorted(facet['value'],
                                     key=lambda k: k['value'],
                                     reverse=True)
+        if label in cfg.custom_value_sorts():
+            # custom sorting is done in addition to freq/alhpanum, this means
+            # that all values not specified in the custom sort will be sorted
+            # as specified in the 'api' config section or according to the
+            # default by frequency
+            top_labels = cfg.custom_value_sorts()[label]['sort_top']
+            bottom_labels = cfg.custom_value_sorts()[label]['sort_bottom']
+            dictionary = OrderedDict()
+            for item in facet['value']:
+                dictionary[item['label']] = item
+            facet['value'] = custom_sort(dictionary, top_labels, bottom_labels)
 
         pre_facets[label] = facet
 
