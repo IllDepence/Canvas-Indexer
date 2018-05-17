@@ -68,10 +68,15 @@ def index():
 
 @pd.route('/facets', methods=['GET'])
 def facets():
+    """ Facets. Returns an overview of the indexed metadata.
+    """
 
     db_entry = FacetList.query.first()
-    facet_list = json.loads(db_entry.json_string,
-                            object_pairs_hook=OrderedDict)
+    if db_entry:
+        facet_list = json.loads(db_entry.json_string,
+                                object_pairs_hook=OrderedDict)
+    else:
+        facet_list = {'facets': []}
 
     resp = Response(json.dumps(facet_list, indent=4))
     resp.headers['Content-Type'] = 'application/json'
@@ -80,6 +85,8 @@ def facets():
 
 @pd.route('/api', methods=['GET'])
 def api():
+    """ Search API.
+    """
 
     # parse request arguments
     # select
@@ -260,6 +267,9 @@ def api():
 # @pd.route('/build/', methods=['POST'])
 def build():
     """ Build a Curation.
+
+        Currently disabled. Could be enabled for debug mode (like index) but
+        has to be tested first.
     """
 
     canvases = json.loads(request.form.get('json'))
