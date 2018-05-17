@@ -226,6 +226,23 @@ def api():
                 if len(dupes) == 2:
                     if r['curationUrl'] not in unique_cur_urls:
                         merged_results.append(combine(*dupes))
+                elif len(dupes) > 2:
+                    # FIXME: 1. this can be done more efficient
+                    #        2. look in what kind of cases dupes is >2
+                    if r['curationUrl'] not in unique_cur_urls:
+                        has_cur = None
+                        has_can = None
+                        for cr in dupes:
+                            if cr['curationHit']:
+                                has_cur = cr
+                            else:
+                                has_can = cr
+                            if has_cur and has_can:
+                                break
+                        if has_cur and has_can:
+                            merged_results.append(combine(has_cur, has_can))
+                        else:
+                            merged_results.append(cr)
                 else:
                     merged_results.append(r)
                 unique_cur_urls.append(r['curationUrl'])
