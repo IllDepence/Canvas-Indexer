@@ -107,7 +107,7 @@ session = DBSession()
 class Assoc():
     """ Class for describing a document (in relation to a metadata term it is
         being associated with) alongside the metatada's relative type (direct/
-        context/content) and the actor (human or software) that associated the
+        context/content) and the actor (human or machine) that associated the
         document with the metadata.
     """
 
@@ -145,15 +145,22 @@ def build_facet_list():
         for val in vals:
             unkown_count = 0
             human_count = 0
-            software_count = 0
+            machine_count = 0
             for a in assocs:
                 if a.term.term == val:
                     if a.actor == 'human':
                         human_count += 1
-                    elif a.actor == 'software':
-                        software_count += 1
+                    elif a.actor == 'machine':
+                        machine_count += 1
                     else:
-                        unkown_count += 1
+                        # unkown_count += 1
+                        human_count += 1
+                        # Currently the API part of Canvas Indexer works with
+                        # the assumption that unknown metadata is human
+                        # generated. Since build_facet_list pre generates a
+                        # reply of the API, unknown is treated as human here
+                        # as well
+        # agents are humans.
             # unknwon actor
             if unkown_count > 0:
                 entry = OrderedDict()
@@ -167,12 +174,12 @@ def build_facet_list():
                 entry['value'] = human_count
                 entry['agent'] = 'human'
                 facet['value'].append(entry)
-            # software actor
-            if software_count > 0:
+            # machine actor
+            if machine_count > 0:
                 entry = OrderedDict()
                 entry['label'] = val
-                entry['value'] = software_count
-                entry['agent'] = 'software'
+                entry['value'] = machine_count
+                entry['agent'] = 'machine'
                 facet['value'].append(entry)
         # sort
         if label in cfg.facet_value_sort_alphanum():
