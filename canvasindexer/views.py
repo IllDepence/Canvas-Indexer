@@ -85,18 +85,21 @@ def api():
     # select
     select = request.args.get('select', 'curation')
     if select not in ['curation', 'canvas']:
-        return abort(400, 'Mandatory parameter "select" must be either "curati'
-                          'on" or "canvas".')
+        return abort(400, 'Parameter "select" must be either "curation" or "ca'
+                          'nvas" or not set.')
     # from
     valid_froms = True
+    from_default = 'curation,canvas'
     vrom = request.args.get('from', 'curation,canvas')
+    if vrom == '':
+        vrom = from_default
     for v in vrom.split(','):
         if v not in ['curation', 'canvas']:
             valid_froms = False
     if not valid_froms:
-        return abort(400, 'Mandatory parameter "from" must be a comma seperate'
-                          'd list (length >= 1), containing only the terms "cu'
-                          'ration" and "canvas".')
+        return abort(400, 'Parameter "from" must be a comma seperated list (le'
+                          'ngth >= 1), containing only the terms "curation" an'
+                          'd "canvas".')
     # where*
     where = request.args.get('where', False)
     where_metadata_label = request.args.get('where_metadata_label', False)
@@ -107,7 +110,18 @@ def api():
         return abort(400, 'You can either set parameter "where" or set both pa'
                           'rameters "where_metadata_label" and "where_metadata'
                           '_value')
-    where_agent = request.args.get('where_agent', False)
+    valid_where_agent = True
+    where_agent_detault = 'human,machine'
+    where_agent = request.args.get('where_agent', where_agent_detault)
+    if where_agent == '':
+        where_agent = where_agent_detault
+    for wa in where_agent.split(','):
+        if wa not in ['human', 'machine']:
+            valid_where_agent = False
+    if not valid_where_agent:
+        return abort(400, 'Parameter "where_agent" must be a comma seperated l'
+                          'ist (length >= 1), containing only the terms "human'
+                          '" and "machine".')
     if where:
         fuzzy = True
     else:
@@ -124,6 +138,7 @@ def api():
     else:
         ret['where_metadata_label'] = where_metadata_label
         ret['where_metadata_value'] = where_metadata_value
+    ret['where_agent'] = where_agent
     # ret['fuzzy'] = fuzzy
 
     # select tables
@@ -141,7 +156,21 @@ def api():
     terms = Term.query
     if vrom not in ['curation,canvas', 'canvas,curation']:
         assocs = assocs.filter(Assoc.metadata_type == vrom)
-    if where_agent:
+    if where_agent in ['human,machine', 'machine,human']:
+        # NOTE: this should actually filter for 'human' or 'machine' or
+        # 'unknown', but in its current, controlled application setup there are
+        # no values except those three, so we just skip the filtering to avoid
+        # unnecessary processing
+        pass
+    elif where_agent == 'human':
+        # the Canvas Indexer crawling process accepts any type of 'agent'
+        # value for metadata and sets it to 'unknown' if not specified.
+        # the API endpoint, however, currently limits queries to the values
+        # 'human' and 'machine' *but* adds the assumption that unknown
+        # agents are humans.
+        assocs = assocs.filter((Assoc.actor == 'human') |
+                               (Assoc.actor == 'unknown'))
+    else:
         assocs = assocs.filter(Assoc.actor == where_agent)
     if where:
         if fuzzy:

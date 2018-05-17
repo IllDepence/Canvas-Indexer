@@ -39,6 +39,7 @@ from | `curation,canvas` | set the type of metadata the search results should be
 where |  | search keyword
 where\_metadata\_label |  | used to search by a property+value pair. requires where\_metadata\_value
 where\_metadata\_value |  | used to search by a property+value pair. requires where\_metadata\_label
+where\_agent | `human,machine` | set the type of metadata creator to `human`, `machine` or a comma seperated list of aforementioned
 start | `0` | 0 based index from which to start listing results from the list of all results
 limit | `null` meaning no limit | limit the number of results being returned
 
