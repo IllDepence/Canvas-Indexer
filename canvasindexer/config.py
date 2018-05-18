@@ -27,6 +27,9 @@ class Cfg():
     def as_sources(self):
         return self.cfg['as_sources']
 
+    def crawler_log_file(self):
+        return self.cfg['crawler_log_file']
+
     def facet_label_sort_top(self):
         return self.cfg['facet_label_sort_top']
 
@@ -47,6 +50,7 @@ class Cfg():
         cfg = {}
         cfg['db_uri'] = 'sqlite:////tmp/ci_tmp.db'
         cfg['as_sources'] = []
+        cfg['crawler_log_file'] = '/tmp/ci_crawl_log.txt'
         cfg['facet_label_sort_top'] = []
         cfg['facet_label_sort_bottom'] = []
         cfg['facet_value_sort_frequency'] = []
@@ -72,6 +76,9 @@ class Cfg():
                 as_sources = cp['crawler'].get('as_sources')
                 cfg['as_sources'] = [s.strip() for s in as_sources.split(',')
                                      if len(s) > 0]
+            crawler_log_file = cp['crawler'].get('log_file', False)
+            if crawler_log_file and len(crawler_log_file) > 0:
+                cfg['crawler_log_file'] = crawler_log_file
         # Sorting of API responses
         if 'api' in cp.sections():
             sort_options = ['facet_label_sort_top',

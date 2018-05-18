@@ -14,6 +14,7 @@ section | key | default | explanation
 ------- | --- | ------- | -----------
 shared | db\_uri | sqlite:////tmp/ci\_tmp.db | a [SQLAlchemy database URI](http://docs.sqlalchemy.org/en/latest/core/engines.html#database-urls) (file system paths have to be absolute)
 crawler | as\_sources | [] | comma seperated list of links to [Activity Streams](https://www.w3.org/TR/activitystreams-core/) in form of OrderedCollections
+&zwnj; | log\_file | /tmp/ci\_crawl\_log.txt | file system path to where the crawling details should be logged
 api | facet\_label\_sort\_top | [] | comma seperated list defining the beginning of the list returned for the `/facets` endpoint
 &zwnj; | facet\_label\_sort\_bottom | [] | comma seperated list defining the end of the list returned for the `/facets` endpoint
 &zwnj; | facet\_value\_sort\_frequency | [] | comma seperated list of facets to be sorted by frequency

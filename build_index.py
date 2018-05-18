@@ -5,6 +5,8 @@ import re
 import requests
 import sys
 from collections import OrderedDict
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 from sqlalchemy import (Column, Integer, ForeignKey, UniqueConstraint,
                         String, UnicodeText, DateTime, create_engine, desc)
 from sqlalchemy.orm import sessionmaker, relationship
@@ -115,6 +117,33 @@ class Assoc():
         self.doc = doc
         self.typ = typ
         self.act = act
+
+
+def requests_retry_session(retries=5, backoff_factor=0.2,
+                           status_forcelist=(500, 502, 504),
+                           session=None):
+    """ Method to use instead of requests.get to allow for retries during the
+        crawling process. Ideally the crawler should, outside of this method,
+        keep track of resources that could not be dereferenced, and offer some
+        kind of way to retry for those resources at a later point in time (e.g.
+        the next crawling run.
+
+        Code from and discussion at:
+        https://www.peterbe.com/plog/best-practice-with-retries-with-requests
+    """
+
+    session = session or requests.Session()
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
 
 
 def build_facet_list():
@@ -257,13 +286,25 @@ def get_referenced(json_dict, attrib):
         its id.
     """
 
+    url = None
     if type(json_dict[attrib]) == str:
-        resp = requests.get(json_dict[attrib])
+        url = json_dict[attrib]
     elif type(json_dict[attrib]) == dict:
         if json_dict[attrib].get('id', False):
-            resp = requests.get(json_dict[attrib]['id'])
+            url = json_dict[attrib]['id']
         elif json_dict[attrib].get('@id', False):
-            resp = requests.get(json_dict[attrib]['@id'])
+            url = json_dict[attrib]['@id']
+
+    try:
+        resp = requests_retry_session().get(url)
+    except Exception as e:
+        log('Could not dereference resource at {}. Error {}.'.format(
+            url,
+            e.__class__.__name__
+            )
+        )
+        return '{}'
+
     return resp.json()
 
 
@@ -295,7 +336,7 @@ def get_img_compliance_level(profile):
                 lvl = found
                 break
     if lvl == -1:
-        print('Could not find compliance level in info.json.')
+        log('Could not find compliance level in info.json.')
     return lvl
 
 
@@ -360,7 +401,16 @@ def build_canvas_doc(man, cur_can):
                 #       then [0:-4] cuts off /{size}/...{format}
                 info_url = '{}/info.json'.format(url_base)
                 doc['canvas'] = info_url
-                resp = requests.get(info_url)
+                try:
+                    resp = requests_retry_session().get(info_url)
+                except Exception as e:
+                    log(('Could not get info.json at {}.'
+                         ' Error {}.').format(
+                        url,
+                        e.__class__.__name__
+                        )
+                    )
+                    resp =  '{}'
                 info_dict = resp.json()
                 profile = info_dict.get('profile')
                 quality = None
@@ -555,8 +605,10 @@ def log(msg):
     """
 
     timestamp = str(datetime.datetime.now()).split('.')[0]
-    print('[{}]   {}'.format(timestamp, msg))
+    with open(cfg.crawler_log_file(), 'a') as f:
+        f.write('[{}]   {}\n'.format(timestamp, msg))
 
+log('- - - - - - - - - - START - - - - - - - - - -')
 log('building lookup dictionaries of existing recrods')
 # build lookup dictionaries of existing recrods
 term_tup_dict = {}
@@ -599,11 +651,16 @@ try:
     #         need for one last_crawl
     #         date per source?
 except requests.exceptions.RequestException as e:
-    print('Could not access Activity Stream. ({})'.format(e))
+    msg = 'Could not access Activity Stream. ({})'.format(e)
+    log(msg)
+    print(msg)
     sys.exit(1)
 if resp.status_code != 200:
-    print('Could not access Activity Stream. (HTTP {})'.format(
-                                                            resp.status_code))
+    msg = 'Could not access Activity Stream. (HTTP {})'.format(
+                                                            resp.status_code
+                                                              )
+    log(msg)
+    print(msg)
     sys.exit(1)
 as_oc = resp.json()
 log('start iterating over Activity Stream pages')
@@ -803,3 +860,7 @@ if new_activity:
         db_entry.json_string = json.dumps(facet_list)
     session.add(db_entry)
     session.commit()
+else:
+    log('no changes. skipping generation of facet list')
+
+log('- - - - - - - - - - END - - - - - - - - - -')
