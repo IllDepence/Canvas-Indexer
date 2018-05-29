@@ -39,6 +39,7 @@ facet\_value\_sort\_custom\_&lt;name&gt; | label | &zwnj; | facet label for whic
 #### Notes
 
 * The crawler is designed to be run periodically. On its first run it will go through an Activity Stream in its entirety, subsequent runs will only regard Activities that occured *after* the previous run.
+* In its current state the crawler indexes only the label value pairs given in a IIIF resource's [metadata](http://iiif.io/api/presentation/2.1/#metadata) property.
 
 ### Search API
 
