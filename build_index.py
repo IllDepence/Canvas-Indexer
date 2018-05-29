@@ -845,7 +845,7 @@ while True:
 
 # persist crawl log
 crawl_log = CrawlLog(new_canvases=new_canvases,
-                     datetime=datetime.datetime.now().isoformat())
+                     datetime=datetime.datetime.utcnow().isoformat())
 session.add(crawl_log)
 session.commit()
 if new_activity:
