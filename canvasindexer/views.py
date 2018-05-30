@@ -228,7 +228,6 @@ def api():
                         merged_results.append(combine(*dupes))
                 elif len(dupes) > 2:
                     # FIXME: 1. this can be done more efficient
-                    #        2. look in what kind of cases dupes is >2
                     if r['curationUrl'] not in unique_cur_urls:
                         has_cur = None
                         has_can = None
@@ -249,7 +248,7 @@ def api():
             all_results = merged_results
             # apply start & limit
             results = all_results[start:]
-            if len(results) > limit:
+            if limit >= 0 and len(results) > limit:
                 results = results[0:limit]
         else:
             # for canvases, there is no result joining, so we can use start
