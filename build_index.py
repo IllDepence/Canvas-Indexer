@@ -28,7 +28,7 @@ class TermCurationAssoc(Base):
     #        type or actor is different (i.e. extend primary key)
     #        (currently no prob b/c only canvas metadata and language split
     #        between actors types)
-    #        when changed has to be reflected in term_cur_assoc_list
+    #        when changed has to be reflected in lo.term_cur_assoc_list
     metadata_type = Column('metadata_type', String(255))
     actor = Column('actor', String(255))
     term = relationship('Term')
@@ -45,7 +45,7 @@ class TermCanvasAssoc(Base):
     #        type or actor is different (i.e. extend primary key)
     #        (currently no prob b/c only canvas metadata and language split
     #        between actors types)
-    #        when changed has to be reflected in term_can_assoc_list
+    #        when changed has to be reflected in lo.term_can_assoc_list
     metadata_type = Column('metadata_type', String(255))
     actor = Column('actor', String(255))
     term = relationship('Term')
@@ -105,18 +105,16 @@ Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
-
-class Assoc():
-    """ Class for describing a document (in relation to a metadata term it is
-        being associated with) alongside the metatada's relative type (direct/
-        context/content) and the actor (human or machine) that associated the
-        document with the metadata.
+class LookUp():
+    """ Singleton class for lookup dicts and lists.
     """
 
-    def __init__(self, doc, typ, act):
-        self.doc = doc
-        self.typ = typ
-        self.act = act
+    instance = None
+    def __init__(self):
+        if not LookUp.instance:
+            LookUp.instance = self
+    def __getattr__(self, attr):
+        return getattr(LookUp.instance, attr)
 
 
 def requests_retry_session(retries=5, backoff_factor=0.2,
@@ -280,10 +278,8 @@ def custom_sort(dictionary, sort_top_labels, sort_bottom_labels):
     return ret
 
 
-def get_referenced(json_dict, attrib):
-    """ Get a value (of an attribute in a dict) that is not included in its
-        entirety but just just referenced by a URI or an object with a URI as
-        its id.
+def get_attrib_uri(json_dict, attrib):
+    """ Get the URI for an attribute.
     """
 
     url = None
@@ -294,6 +290,16 @@ def get_referenced(json_dict, attrib):
             url = json_dict[attrib]['id']
         elif json_dict[attrib].get('@id', False):
             url = json_dict[attrib]['@id']
+    return url
+
+
+def get_referenced(json_dict, attrib):
+    """ Get a value (of an attribute in a dict) that is not included in its
+        entirety but just referenced by a URI or an object with a URI as its
+        id.
+    """
+
+    url = get_attrib_uri(json_dict, attrib)
 
     try:
         resp = requests_retry_session().get(url)
@@ -471,7 +477,7 @@ def build_curation_doc(cur, activity, canvas_doc=None, cur_can_idx=None):
     """ Build a document (OrderedDict) with all information necessary to
         display a search result for a Curation.
 
-        If canvas_doc is given this is assumed to be a sarch result associated
+        If canvas_doc is given, this is assumed to be a sarch result associated
         with Canvas metadata. Otherwise (search result associated with Curation
         top level metadata) the method enhance_top_meta_curation_doc is to be
         used to retroactively add missing information.
@@ -489,9 +495,10 @@ def build_curation_doc(cur, activity, canvas_doc=None, cur_can_idx=None):
         num_canvases += len(ran.get('members', []))
         num_canvases += len(ran.get('canvases', []))
     doc['totalImages'] = num_canvases
-    # TODO: once implemented in JSONkeeper, use the activity's endtime in case
-    #       it's an Update Activity
-    doc['crawledAt'] = datetime.datetime.now().isoformat()
+    if activity['type'] == 'Update':
+        doc['crawledAt'] = activity['endTime']
+    else:
+        doc['crawledAt'] = datetime.datetime.utcnow().isoformat()
     # - - -
     if canvas_doc:
         canvas_hit = OrderedDict()
@@ -554,7 +561,7 @@ def build_qualifier_tuple(something):
 
 
 def merge_iiif_doc_metadata(old_doc, new_doc):
-    """ Given two IIIF documents (e.g. Canvas) as dictionaries, merge the
+    """ Given two IIIF documents (e.g. Canvases) as dictionaries, merge the
         contents of their `metadata` attribute on the root level.
         This assumes metadata to be a list of dictionaries with `label` and
         `value` keys as recommended in iiif.io/api/presentation/2.1/#metadata.
@@ -608,41 +615,292 @@ def log(msg):
     with open(cfg.crawler_log_file(), 'a') as f:
         f.write('[{}]   {}\n'.format(timestamp, msg))
 
+
+def index_canvases_in_cur_selection(cur,
+                                    man,
+                                    canvases,
+                                    found_top_metadata,
+                                    top_cur_db,
+                                    top_doc_has_thumbnail,
+                                    top_cur_doc,
+                                    top_term,
+                                    top_term_db_id,
+                                    top_actor):
+    """ Iterate over a list of Canvases in one of the ranges of a Curation, and
+        write the resulting index entries into the DB.
+    """
+
+    lo = LookUp()
+    new_canvases = 0
+    for cur_can_idx, cur_can_dict in enumerate(canvases):
+        log('canvas #{}'.format(cur_can_idx))
+        # TODO: mby get read and include man[_can] metadata
+        can_doc = build_canvas_doc(man, cur_can_dict)
+        can_uri = can_doc['canvasId']+can_doc['fragment']
+        can_cur_doc = build_curation_doc(cur, activity, can_doc,
+                                     cur_can_idx)
+        # canvas
+        if can_uri not in lo.canvas_uri_dict:
+            new_canvases += 1
+            can_db = Canvas(canvas_uri=can_uri,
+                         json_string=json.dumps(can_doc))
+            session.add(can_db)
+            session.flush()
+            lo.canvas_uri_dict[can_uri] = can_db.id
+            can_db_id = can_db.id
+        else:
+            can_db_id = lo.canvas_uri_dict[can_uri]
+            # extend the Canvas' metadata
+            # NOTE: no distinction between Create and Update here because
+            #       Curations only reference Canvases in Manifests. Regardless
+            #       of the Curation being known or not, if it contains Canvases
+            #       we already know, we just need to extend the metadata that
+            #       is being associated with them.
+            can_db = session.query(Canvas).filter(
+                            Canvas.canvas_uri == can_uri).first()
+            old_can_dict = json.loads(can_db.json_string)
+            merged_doc = merge_iiif_doc_metadata(old_can_dict, cur_can_dict)
+            can_db.json_string = json.dumps(merged_doc)
+            session.add(can_db)
+            session.flush()
+        # still curation metadata
+        if found_top_metadata and top_cur_db and \
+                not top_doc_has_thumbnail:
+            # enhance (cur metadata-) cur
+            enhance_top_meta_curation_doc(top_cur_doc, can_doc)
+            top_cur_db.json_string = json.dumps(top_cur_doc)
+            top_doc_has_thumbnail = True
+            # can assoc
+            tcaa_key = (lo.term_tup_dict[top_term],
+                        lo.canvas_uri_dict[can_uri])
+            if tcaa_key not in lo.term_can_assoc_list:
+                lo.term_can_assoc_list.append(tcaa_key)
+                assoc = TermCanvasAssoc(term_id=top_term_db_id,
+                                        canvas_id=can_db_id,
+                                        metadata_type='curation',
+                                        actor=top_actor)
+                session.add(assoc)
+
+        # canvas metadata
+        for md in cur_can_dict.get('metadata', []):
+            can_term = build_qualifier_tuple(md)
+            if not can_term[1]:
+                # don't allow empty values
+                continue
+            # term
+            if can_term not in lo.term_tup_dict:
+                term = Term(term=can_term[1],
+                            qualifier=can_term[0])
+                session.add(term)
+                session.flush()
+                lo.term_tup_dict[can_term] = term.id
+                can_term_id = term.id
+            else:
+                can_term_id = lo.term_tup_dict[can_term]
+            # can assoc
+            tcaa_key = (lo.term_tup_dict[can_term],
+                        lo.canvas_uri_dict[can_uri])
+            can_actor = md.get('agent', 'unknown')
+            if tcaa_key not in lo.term_can_assoc_list:
+                assoc = TermCanvasAssoc(term_id=can_term_id,
+                                        canvas_id=can_db_id,
+                                        metadata_type='canvas',
+                                        actor=can_actor)
+                session.add(assoc)
+                lo.term_can_assoc_list.append(tcaa_key)
+            # cur
+            can_cur_uri = '{}{}{}'.format(can_cur_doc['curationUrl'],
+                                          can_term[1],
+                                          'canvas')
+            if can_cur_uri not in lo.curation_uri_dict:
+                can_cur_db = Curation(curation_uri=can_cur_uri,
+                                      json_string=json.dumps(can_cur_doc))
+                session.add(can_cur_db)
+                session.flush()
+                lo.curation_uri_dict[can_cur_uri] = can_cur_db.id
+                can_cur_id = can_cur_db.id
+            else:
+                can_cur_id = lo.curation_uri_dict[can_cur_uri]
+                if activity['type'] == 'Update':
+                    # Update DB record
+                    log('Updating DB record')
+                    can_cur_db = session.query(Curation).filter(
+                                            Curation.id == can_cur_id).first()
+                    can_cur_db.json_string = json.dumps(can_cur_doc)
+                    session.add(can_cur_db)
+                    session.flush()
+                elif activity['type'] == 'Create':
+                    # nothing to do we just needed the DB ID for assocs
+                    pass
+            # cur assoc
+            tcua_key = (lo.term_tup_dict[can_term],
+                        lo.curation_uri_dict[can_cur_uri])
+            can_actor = md.get('agent', 'unknown')
+            if tcua_key not in lo.term_cur_assoc_list:
+                assoc = TermCurationAssoc(term_id=can_term_id,
+                                          curation_id=can_cur_id,
+                                          metadata_type='curation',
+                                          actor=can_actor)
+                session.add(assoc)
+                lo.term_cur_assoc_list.append(tcua_key)
+    return new_canvases
+
+
+def process_curation_create_or_update(activity):
+    """ Process a create or update activity that has a cr:Curation as its
+        object.
+    """
+
+    lo = LookUp()
+    new_canvases = 0
+    log('retrieving curation {}'.format(activity['object']['@id']))
+    cur_dict = get_referenced(activity, 'object')
+    top_cur_doc = build_curation_doc(cur_dict, activity)
+    found_top_metadata = False
+    log('going through top level metadata')
+    # curation metadata
+    for md in cur_dict.get('metadata', []):
+        top_term = build_qualifier_tuple(md)
+        if not top_term[1]:
+            # don't allow empty values
+            continue
+        # term
+        if top_term not in lo.term_tup_dict:
+            term = Term(term=top_term[1], qualifier=top_term[0])
+            session.add(term)
+            session.flush()
+            lo.term_tup_dict[top_term] = term.id
+            top_term_db_id = term.id
+        else:
+            top_term_db_id = lo.term_tup_dict[top_term]
+        # cur
+        top_cur_uri = top_cur_doc['curationUrl']+top_term[1]+'curation'
+        if top_cur_uri not in lo.curation_uri_dict:
+            # new
+            top_cur_db = Curation(curation_uri=top_cur_uri,
+                                  json_string=json.dumps(top_cur_doc))
+            session.add(top_cur_db)
+            session.flush()
+            lo.curation_uri_dict[top_cur_uri] = top_cur_db.id
+            top_cur_db_id = top_cur_db.id
+        else:
+            # existing
+            top_cur_db_id = lo.curation_uri_dict[top_cur_uri]
+            if activity['type'] == 'Update':
+                # Update DB record
+                log('Updating DB record')
+                top_cur_db = session.query(Curation).filter(
+                                        Curation.id == top_cur_db_id).first()
+                top_cur_db.json_string = json.dumps(top_cur_doc)
+                session.add(top_cur_db)
+                session.flush()
+            elif activity['type'] == 'Create':
+                # No change to DB record needed
+                top_cur_db = None
+        # cur assoc
+        tcua_key = (lo.term_tup_dict[top_term],
+                    lo.curation_uri_dict[top_cur_uri])
+        top_actor = md.get('agent', 'unknown')
+        if tcua_key not in lo.term_cur_assoc_list:
+            assoc = TermCurationAssoc(term_id=top_term_db_id,
+                                      curation_id=top_cur_db_id,
+                                      metadata_type='curation',
+                                      actor=top_actor)
+            session.add(assoc)
+            session.flush()
+            lo.term_cur_assoc_list.append(tcua_key)
+        found_top_metadata = True
+
+    top_doc_has_thumbnail = False
+    log('entering ranges')
+    for ran in cur_dict.get('selections', []):
+        # Manifest is the same for all Canvases ahead, so get it now
+        man = get_referenced(ran, 'within')
+        todo = len(ran.get('members', []) + ran.get('canvases', []))
+        log('processing {} canvases'.format(todo))
+
+        canvases = ran.get('members', []) + ran.get('canvases', [])
+        new_canvases += index_canvases_in_cur_selection(cur_dict,
+                                                man,
+                                                canvases,
+                                                found_top_metadata,
+                                                top_cur_db,
+                                                top_doc_has_thumbnail,
+                                                top_cur_doc,
+                                                top_term,
+                                                top_term_db_id,
+                                                top_actor)
+        log('done')
+    return new_canvases
+
+
+def process_curation_delete(activity):
+    """ Process a delete activity that has a cr:Curation as its object.
+    """
+
+    cur_uri = get_attrib_uri(activity, 'object')
+    to_del = session.query(Curation).filter(
+                Curation.curation_uri.ilike('%{}%'.format(cur_uri))
+                ).all()
+    for cur_db in to_del:
+        log(('Deleting curation record {} and all term associations belonging'
+             'to it').format(cur_db.curation_uri))
+        session.query(TermCurationAssoc).filter(
+                TermCurationAssoc.curation_id == cur_db.id
+                ).delete()
+        session.query(Curation).filter(
+                Curation.id == cur_db.id
+                ).delete()
+    session.commit()
+
+
+def populate_lookup_instance():
+    """ Populate the LookUp singleton with all records already indexed. This is
+        used during crawling to see if a record for a given identifier (e.g.
+        the label + value for a metadata entry) already exists, and if so,
+        provide the DB ID it was given to create new associations (e.g. with
+        Canvases).
+    """
+
+    log('building lookup dictionaries of existing recrods')
+    # build lookup dictionaries of existing recrods
+    term_tup_dict = {}
+    terms = session.query(Term).all()
+    if terms:
+        for term in terms:
+            term_tup_dict[(term.qualifier, term.term)] = term.id
+    canvas_uri_dict = {}
+    cans = session.query(Canvas).all()
+    if cans:
+        for can in cans:
+            canvas_uri_dict[can.canvas_uri] = can.id
+    curation_uri_dict = {}
+    curs = session.query(Curation).all()
+    if curs:
+        for cur in curs:
+            curation_uri_dict[cur.curation_uri] = cur.id
+    log('building lookup lists of existing associations')
+    # build lookup lists of existing associations
+    term_can_assoc_list = []
+    tcaas = session.query(TermCanvasAssoc).all()
+    if tcaas:
+        for tcaa in tcaas:
+            term_can_assoc_list.append((tcaa.term_id, tcaa.canvas_id))
+    term_cur_assoc_list = []
+    tcuas = session.query(TermCurationAssoc).all()
+    if tcuas:
+        for tcua in tcuas:
+            term_cur_assoc_list.append((tcua.term_id, tcua.curation_id))
+    lo = LookUp()
+    lo.term_tup_dict = term_tup_dict
+    lo.canvas_uri_dict = canvas_uri_dict
+    lo.curation_uri_dict = curation_uri_dict
+    lo.term_can_assoc_list = term_can_assoc_list
+    lo.term_cur_assoc_list = term_cur_assoc_list
+
+
 log('- - - - - - - - - - START - - - - - - - - - -')
-log('building lookup dictionaries of existing recrods')
-# build lookup dictionaries of existing recrods
-term_tup_dict = {}
-terms = session.query(Term).all()
-if terms:
-    for term in terms:
-        term_tup_dict[(term.qualifier, term.term)] = term.id
-canvas_uri_dict = {}
-cans = session.query(Canvas).all()
-if cans:
-    for can in cans:
-        canvas_uri_dict[can.canvas_uri] = can.id
-curation_uri_dict = {}
-curs = session.query(Curation).all()
-if curs:
-    for cur in curs:
-        curation_uri_dict[cur.curation_uri] = cur.id
-curation_uri_dict = {}
-curs = session.query(Curation).all()
-if curs:
-    for cur in curs:
-        curation_uri_dict[cur.curation_uri] = cur.id
-log('building lookup lists of existing associations')
-# build lookup lists of existing associations
-term_can_assoc_list = []
-tcaas = session.query(TermCanvasAssoc).all()
-if tcaas:
-    for tcaa in tcaas:
-        term_can_assoc_list.append((tcaa.term_id, tcaa.canvas_id))
-term_cur_assoc_list = []
-tcuas = session.query(TermCurationAssoc).all()
-if tcuas:
-    for tcua in tcuas:
-        term_cur_assoc_list.append((tcua.term_id, tcua.curation_id))
+populate_lookup_instance()
 
 log('retrieving Activity Stream')
 try:
@@ -656,9 +914,8 @@ except requests.exceptions.RequestException as e:
     print(msg)
     sys.exit(1)
 if resp.status_code != 200:
-    msg = 'Could not access Activity Stream. (HTTP {})'.format(
-                                                            resp.status_code
-                                                              )
+    msg = ('Could not access Activity Stream. (HTTP {})'
+          ).format(resp.status_code)
     log(msg)
     print(msg)
     sys.exit(1)
@@ -680,161 +937,14 @@ while True:
             last_crawl_time = dateutil.parser.parse(last_crawl.datetime)
         else:
             last_crawl_time = datetime.datetime.fromtimestamp(0).isoformat()
-        # if we haven't seen it yet and it's a Curation create
+        # if we haven't seen it yet and it's about a Curation
         if (not last_crawl or activity_end_time > last_crawl_time) and \
-                activity['type'] == 'Create' and \
                 activity['object']['@type'] == 'cr:Curation':
             new_activity = True
-            log('retrieving curation {}'.format(activity['object']['@id']))
-            cur = get_referenced(activity, 'object')
-            cur_top_doc = build_curation_doc(cur, activity)
-            found_top_metadata = False
-            log('going through top level metadata')
-            # curation metadata
-            for md in cur.get('metadata', []):
-                top_term = build_qualifier_tuple(md)
-                if not top_term[1]:
-                    # don't allow empty values
-                    continue
-                # term
-                if top_term not in term_tup_dict:
-                    term = Term(term=top_term[1], qualifier=top_term[0])
-                    session.add(term)
-                    session.flush()
-                    term_tup_dict[top_term] = term.id
-                    top_term_id = term.id
-                else:
-                    top_term_id = term_tup_dict[top_term]
-                # cur
-                top_cur_uri = cur_top_doc['curationUrl']+top_term[1]+'curation'
-                if top_cur_uri not in curation_uri_dict:
-                    top_cur = Curation(curation_uri=top_cur_uri,
-                                       json_string=json.dumps(cur_top_doc))
-                    session.add(top_cur)
-                    session.flush()
-                    curation_uri_dict[top_cur_uri] = top_cur.id
-                    top_cur_id = top_cur.id
-                else:
-                    top_cur = None
-                    top_cur_id = curation_uri_dict[top_cur_uri]
-                # cur assoc
-                tcua_key = (term_tup_dict[top_term],
-                            curation_uri_dict[top_cur_uri])
-                top_actor = md.get('agent', 'unknown')
-                if tcua_key not in term_cur_assoc_list:
-                    assoc = TermCurationAssoc(term_id=top_term_id,
-                                              curation_id=top_cur_id,
-                                              metadata_type='curation',
-                                              actor=top_actor)
-                    session.add(assoc)
-                    session.flush()
-                    term_cur_assoc_list.append(tcua_key)
-                found_top_metadata = True
-
-            top_doc_has_thumbnail = False
-            log('entering ranges')
-            for ran in cur.get('selections', []):
-                # Manifest is the same for all Canvases ahead, so get it now
-                man = get_referenced(ran, 'within')
-                todo = len(ran.get('members', []) + ran.get('canvases', []))
-                log('processing {} canvases'.format(todo))
-                for cur_can_idx, cur_can in enumerate(ran.get('members', []) +
-                                                      ran.get('canvases', [])):
-                    log('canvas #{}'.format(cur_can_idx))
-                    # TODO: mby get read and include man[_can] metadata
-                    can_doc = build_canvas_doc(man, cur_can)
-                    can_uri = can_doc['canvasId']+can_doc['fragment']
-                    cur_doc = build_curation_doc(cur, activity, can_doc,
-                                                 cur_can_idx)
-                    # canvas
-                    if can_uri not in canvas_uri_dict:
-                        new_canvases += 1
-                        can = Canvas(canvas_uri=can_uri,
-                                     json_string=json.dumps(can_doc))
-                        session.add(can)
-                        session.flush()
-                        canvas_uri_dict[can_uri] = can.id
-                        can_id = can.id
-                    else:
-                        can_id = canvas_uri_dict[can_uri]
-                        # extend the Canvas' metadata
-                        can = session.query(Canvas).filter(
-                                        Canvas.canvas_uri == can_uri).first()
-                        db_can = json.loads(can.json_string)
-                        merged_doc = merge_iiif_doc_metadata(db_can, cur_can)
-                        can.json_string = json.dumps(merged_doc)
-                        session.add(can)
-                        session.flush()
-                    # still curation metadata
-                    if found_top_metadata and top_cur and \
-                            not top_doc_has_thumbnail:
-                        # enhance (cur metadata-) cur
-                        enhance_top_meta_curation_doc(cur_top_doc, can_doc)
-                        top_cur.json_string = json.dumps(cur_top_doc)
-                        top_doc_has_thumbnail = True
-                        # can assoc
-                        tcaa_key = (term_tup_dict[top_term],
-                                    canvas_uri_dict[can_uri])
-                        if tcaa_key not in term_can_assoc_list:
-                            term_can_assoc_list.append(tcaa_key)
-                            assoc = TermCanvasAssoc(term_id=top_term_id,
-                                                    canvas_id=can_id,
-                                                    metadata_type='curation',
-                                                    actor=top_actor)
-                            session.add(assoc)
-
-                    # canvas metadata
-                    for md in cur_can.get('metadata', []):
-                        can_term = build_qualifier_tuple(md)
-                        if not can_term[1]:
-                            # don't allow empty values
-                            continue
-                        # term
-                        if can_term not in term_tup_dict:
-                            term = Term(term=can_term[1],
-                                        qualifier=can_term[0])
-                            session.add(term)
-                            session.flush()
-                            term_tup_dict[can_term] = term.id
-                            can_term_id = term.id
-                        else:
-                            can_term_id = term_tup_dict[can_term]
-                        # can assoc
-                        tcaa_key = (term_tup_dict[can_term],
-                                    canvas_uri_dict[can_uri])
-                        can_actor = md.get('agent', 'unknown')
-                        if tcaa_key not in term_can_assoc_list:
-                            assoc = TermCanvasAssoc(term_id=can_term_id,
-                                                    canvas_id=can_id,
-                                                    metadata_type='canvas',
-                                                    actor=can_actor)
-                            session.add(assoc)
-                            term_can_assoc_list.append(tcaa_key)
-                        # cur
-                        cur_uri = '{}{}{}'.format(cur_doc['curationUrl'],
-                                                  can_term[1],
-                                                  'canvas')
-                        if cur_uri not in curation_uri_dict:
-                            can_cur = Curation(curation_uri=cur_uri,
-                                               json_string=json.dumps(cur_doc))
-                            session.add(can_cur)
-                            session.flush()
-                            curation_uri_dict[cur_uri] = can_cur.id
-                            cur_id = can_cur.id
-                        else:
-                            cur_id = curation_uri_dict[cur_uri]
-                        # cur assoc
-                        tcua_key = (term_tup_dict[can_term],
-                                    curation_uri_dict[cur_uri])
-                        can_actor = md.get('agent', 'unknown')
-                        if tcua_key not in term_cur_assoc_list:
-                            assoc = TermCurationAssoc(term_id=can_term_id,
-                                                      curation_id=cur_id,
-                                                      metadata_type='curation',
-                                                      actor=can_actor)
-                            session.add(assoc)
-                            term_cur_assoc_list.append(tcua_key)
-                log('done')
+            if activity['type'] in ['Create', 'Update']:
+                new_canvases += process_curation_create_or_update(activity)
+            elif activity['type'] == 'Delete':
+                process_curation_delete(activity)
             session.commit()
         else:
             log('skipping')
