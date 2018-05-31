@@ -616,7 +616,8 @@ def log(msg):
         f.write('[{}]   {}\n'.format(timestamp, msg))
 
 
-def index_canvases_in_cur_selection(cur,
+def index_canvases_in_cur_selection(activity,
+                                    cur,
                                     man,
                                     canvases,
                                     found_top_metadata,
@@ -820,7 +821,8 @@ def process_curation_create_or_update(activity):
         log('processing {} canvases'.format(todo))
 
         canvases = ran.get('members', []) + ran.get('canvases', [])
-        new_canvases += index_canvases_in_cur_selection(cur_dict,
+        new_canvases += index_canvases_in_cur_selection(activity,
+                                                cur_dict,
                                                 man,
                                                 canvases,
                                                 found_top_metadata,
@@ -899,78 +901,103 @@ def populate_lookup_instance():
     lo.term_cur_assoc_list = term_cur_assoc_list
 
 
-log('- - - - - - - - - - START - - - - - - - - - -')
-populate_lookup_instance()
+def crawl_single(as_source):
+    """ Crawl, given a URL to an Activity Stream
+    """
 
-log('retrieving Activity Stream')
-try:
-    resp = requests.get(cfg.as_sources()[0])
-    # ↑ TODO: support multiple sources
-    #         need for one last_crawl
-    #         date per source?
-except requests.exceptions.RequestException as e:
-    msg = 'Could not access Activity Stream. ({})'.format(e)
-    log(msg)
-    print(msg)
-    sys.exit(1)
-if resp.status_code != 200:
-    msg = ('Could not access Activity Stream. (HTTP {})'
-          ).format(resp.status_code)
-    log(msg)
-    print(msg)
-    sys.exit(1)
-as_oc = resp.json()
-log('start iterating over Activity Stream pages')
-as_ocp = get_referenced(as_oc, 'last')
-last_crawl = session.query(CrawlLog).order_by(desc(CrawlLog.log_id)).first()
-new_canvases = 0
-new_activity = False
-# for all AS pages
-while True:
-    # for all AC items
-    log('going through AS page {}'.format(as_ocp['id']))
-    for activity in as_ocp['orderedItems']:
-        log('going through {} item {}'.format(activity['type'],
-                                              activity['id']))
-        activity_end_time = dateutil.parser.parse(activity['endTime'])
-        if last_crawl:
-            last_crawl_time = dateutil.parser.parse(last_crawl.datetime)
-        else:
-            last_crawl_time = datetime.datetime.fromtimestamp(0).isoformat()
-        # if we haven't seen it yet and it's about a Curation
-        if (not last_crawl or activity_end_time > last_crawl_time) and \
-                activity['object']['@type'] == 'cr:Curation':
-            new_activity = True
-            if activity['type'] in ['Create', 'Update']:
-                new_canvases += process_curation_create_or_update(activity)
-            elif activity['type'] == 'Delete':
-                process_curation_delete(activity)
-            session.commit()
-        else:
-            log('skipping')
+    log('- - - - - - - - - - START - - - - - - - - - -')
+    populate_lookup_instance()
 
-    if not as_ocp.get('prev', False):
-        break
-    as_ocp = get_referenced(as_ocp, 'prev')
+    log('retrieving Activity Stream')
+    try:
+        resp = requests.get(as_source)
+        # ↑ TODO: support multiple sources
+        #         need for one last_crawl
+        #         date per source?
+    except requests.exceptions.RequestException as e:
+        msg = 'Could not access Activity Stream. ({})'.format(e)
+        log(msg)
+        print(msg)
+        return
+    if resp.status_code != 200:
+        msg = ('Could not access Activity Stream. (HTTP {})'
+              ).format(resp.status_code)
+        log(msg)
+        print(msg)
+        return
+    as_oc = resp.json()
+    log('start iterating over Activity Stream pages')
+    as_ocp = get_referenced(as_oc, 'last')
+    last_crawl = session.query(CrawlLog).order_by(desc(CrawlLog.log_id)
+                                                 ).first()
+    new_canvases = 0
+    new_activity = False
+    # NOTE: seen_activity_objs is used to prevent processing obsolete
+    #       activities. Since we go through the Activity Stream backwards, we
+    #       only process the most recent Activity per IIIF doc.
+    #       (Not doing so might lead to for example trying to process a Create
+    #       for a document for which a Delete was processed just before.)
+    seen_activity_objs = []
+    # for all AS pages
+    while True:
+        # for all AC items
+        log('going through AS page {}'.format(as_ocp['id']))
+        for activity in as_ocp['orderedItems']:
+            log('going through {} item {}'.format(activity['type'],
+                                                  activity['id']))
+            activity_end_time = dateutil.parser.parse(activity['endTime'])
+            if last_crawl:
+                last_crawl_time = dateutil.parser.parse(last_crawl.datetime)
+            else:
+                zero_timestamp = datetime.datetime.fromtimestamp(0)
+                last_crawl_time = zero_timestamp.isoformat()
+            # if we haven't seen it yet and it's about a Curation
+            if (not last_crawl or activity_end_time > last_crawl_time) and \
+                    activity['object']['@type'] == 'cr:Curation' and \
+                    activity['object'] not in seen_activity_objs:
+                new_activity = True
+                if activity['type'] in ['Create', 'Update']:
+                    new_canvases += process_curation_create_or_update(activity)
+                elif activity['type'] == 'Delete':
+                    process_curation_delete(activity)
+                session.commit()
+                seen_activity_objs.append(activity['object'])
+            else:
+                log('skipping')
 
-# persist crawl log
-crawl_log = CrawlLog(new_canvases=new_canvases,
-                     datetime=datetime.datetime.utcnow().isoformat())
-session.add(crawl_log)
-session.commit()
-if new_activity:
-    log('generating facet list')
-    # build and persist facet list
-    facet_list = build_facet_list()
-    log('persisting facet list')
-    db_entry = session.query(FacetList).first()
-    if not db_entry:
-        db_entry = FacetList(json_string=json.dumps(facet_list))
-    else:
-        db_entry.json_string = json.dumps(facet_list)
-    session.add(db_entry)
+        if not as_ocp.get('prev', False):
+            break
+        as_ocp = get_referenced(as_ocp, 'prev')
+
+    # persist crawl log
+    crawl_log = CrawlLog(new_canvases=new_canvases,
+                         datetime=datetime.datetime.utcnow().isoformat())
+    session.add(crawl_log)
     session.commit()
-else:
-    log('no changes. skipping generation of facet list')
+    if new_activity:
+        log('generating facet list')
+        # build and persist facet list
+        facet_list = build_facet_list()
+        log('persisting facet list')
+        db_entry = session.query(FacetList).first()
+        if not db_entry:
+            db_entry = FacetList(json_string=json.dumps(facet_list))
+        else:
+            db_entry.json_string = json.dumps(facet_list)
+        session.add(db_entry)
+        session.commit()
+    else:
+        log('no changes. skipping generation of facet list')
 
-log('- - - - - - - - - - END - - - - - - - - - -')
+    log('- - - - - - - - - - END - - - - - - - - - -')
+
+
+def crawl():
+    """ Crawl all Activity Streams set in the config.
+    """
+
+    for as_source in cfg.as_sources():
+        crawl_single(as_source)
+
+if __name__ == '__main__':
+    crawl()
