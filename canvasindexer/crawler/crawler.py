@@ -997,6 +997,3 @@ def crawl():
 
     for as_source in cfg.as_sources():
         crawl_single(as_source)
-
-if __name__ == '__main__':
-    crawl()

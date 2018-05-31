@@ -22,12 +22,13 @@ section | key | default | explanation
 ------- | --- | ------- | -----------
 shared | db\_uri | sqlite:////tmp/ci\_tmp.db | a [SQLAlchemy database URI](http://docs.sqlalchemy.org/en/latest/core/engines.html#database-urls) (file system paths have to be absolute)
 crawler | as\_sources | [] | comma seperated list of links to [Activity Streams](https://www.w3.org/TR/activitystreams-core/) in form of OrderedCollections
+&zwnj; | interval | 3600 | crawl interval in seconds (value <=0 deactivates automatic crawling)
 &zwnj; | log\_file | /tmp/ci\_crawl\_log.txt | file system path to where the crawling details should be logged
 api | facet\_label\_sort\_top | [] | comma seperated list defining the beginning of the list returned for the `/facets` endpoint
 &zwnj; | facet\_label\_sort\_bottom | [] | comma seperated list defining the end of the list returned for the `/facets` endpoint
 &zwnj; | facet\_value\_sort\_frequency | [] | comma seperated list of facets to be sorted by frequency
 &zwnj; | facet\_value\_sort\_alphanum | [] | comma seperated list of facets to be sorted alphanumerically
-facet\_value\_sort\_custom\_&lt;name&gt; | label | &zwnj; | facet label for which a custom order is defined
+facet\_value\_sort\_<br>custom\_&lt;name&gt; | label | &zwnj; | facet label for which a custom order is defined
 &zwnj; | sort\_top | &zwnj; | comma seperated list defining the beginning
 &zwnj; | sort\_bottom | &zwnj; | comma seperated list defining the end
 
