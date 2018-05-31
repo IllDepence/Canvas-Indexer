@@ -18,11 +18,11 @@ def create_app(**kwargs):
         app.config['SQLALCHEMY_DATABASE_URI'] = app.cfg.db_uri()
         app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-        from canvasindexer.models import db
+        from canvasindexer.api.models import db
         db.init_app(app)
         db.create_all()
 
-        from canvasindexer.views import pd
+        from canvasindexer.api.views import pd
         app.register_blueprint(pd)
 
         return app

@@ -3,7 +3,6 @@ import dateutil.parser
 import json
 import re
 import requests
-import sys
 from collections import OrderedDict
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry

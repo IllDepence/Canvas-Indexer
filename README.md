@@ -34,7 +34,8 @@ facet\_value\_sort\_custom\_&lt;name&gt; | label | &zwnj; | facet label for whic
 ## Run
 ### Crawler
 
-    $ python3 build_index.py
+    $ source venv/bin/activate
+    $ python3 run_crawler.py
 
 #### Notes
 

@@ -5,8 +5,9 @@ from collections import OrderedDict
 from flask import (abort, Blueprint, current_app, redirect, request,
                    Response, url_for, render_template)
 from util.iiif import Curation as CurationObj
-from canvasindexer.models import (Term, Canvas, Curation, FacetList,
-                                  TermCanvasAssoc, TermCurationAssoc)
+from canvasindexer.crawler.crawler import crawl
+from canvasindexer.api.models import (Term, Canvas, Curation, FacetList,
+                                      TermCanvasAssoc, TermCurationAssoc)
 
 pd = Blueprint('pd', __name__)
 
@@ -275,6 +276,19 @@ def api():
 
     ret['results'] = results
 
+    resp = Response(json.dumps(ret, indent=4))
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
+@pd.route('/crawl', methods=['GET'])
+def crawl_endpoint():
+    """ Crawl trigger.
+    """
+
+    crawl()
+
+    ret = {'message': 'done'}
     resp = Response(json.dumps(ret, indent=4))
     resp.headers['Content-Type'] = 'application/json'
     return resp
