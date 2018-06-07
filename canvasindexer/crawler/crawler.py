@@ -64,7 +64,7 @@ class Term(Base):
 class Canvas(Base):
     __tablename__ = 'canvas'
     id = Column(Integer, primary_key=True)
-    canvas_uri = Column(String(2048), unique=True)  # ID + fragment
+    canvas_uri = Column(String(2048), unique=True)  # ID + # [+ fragment]
     json_string = Column(UnicodeText())
     terms = relationship('TermCanvasAssoc')
 
@@ -397,6 +397,7 @@ def build_canvas_doc(man, cur_can):
                 doc['canvas'] = info_url
                 try:
                     resp = requests_retry_session().get(info_url)
+                    info_dict = resp.json()
                 except Exception as e:
                     log(('Could not get info.json at {}.'
                          ' Error {}.').format(
@@ -404,8 +405,7 @@ def build_canvas_doc(man, cur_can):
                         e.__class__.__name__
                         )
                     )
-                    resp =  '{}'
-                info_dict = resp.json()
+                    info_dict =  {}
                 profile = info_dict.get('profile')
                 quality = None
                 quality_options = info_dict.get('qualities', [])
@@ -625,7 +625,7 @@ def index_canvases_in_cur_selection(lo,
         log('canvas #{}'.format(cur_can_idx))
         # TODO: mby get read and include man[_can] metadata
         can_doc = build_canvas_doc(man, cur_can_dict)
-        can_uri = can_doc['canvasId']+can_doc['fragment']
+        can_uri = '{}#{}'.format(can_doc['canvasId'], can_doc['fragment'])
         can_cur_doc = build_curation_doc(cur, activity, can_doc,
                                      cur_can_idx)
         # canvas
@@ -849,10 +849,19 @@ def process_curation_delete(activity):
 
     # delete orphaned Canvases if configured
     if not cfg.allow_orphan_canvases():
-        pass # FIXME: implement
-        # - obtain Cur
-        # - get contained Caonvas cutouts
-        # - go through DB and delete
+        pass
+        # cur_dict = get_referenced(activity, 'object')
+        # for ran in cur_dict.get('selections', []):
+        #     for can in  ran.get('members', []) + ran.get('canvases', [])
+        #         url_parts = can['@id'].split('#')
+        #         can_id = url_parts[0]
+        #         if len(url_parts) == 2:
+        #             fragment = url_parts[1]
+        #         else:
+        #             fragment = ''
+        #         can_uri = '{}#{}'.format(can_id, fragment)
+        #         # need for cur->can assoc here
+        # TODO: implement
 
 
 def get_lookup_dict():
