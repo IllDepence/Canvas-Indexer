@@ -6,103 +6,12 @@ import requests
 from collections import OrderedDict
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-from sqlalchemy import (Column, Integer, ForeignKey, UniqueConstraint,
-                        String, UnicodeText, DateTime, create_engine, desc)
-from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy.sql import func
-from sqlalchemy.ext.declarative import declarative_base
+from canvasindexer.models import (db, Term, Canvas, Curation, FacetList,
+                                  TermCanvasAssoc, TermCurationAssoc, CrawlLog)
+from sqlalchemy import desc
 from canvasindexer.config import Cfg
 
 cfg = Cfg()
-Base = declarative_base()
-
-
-class TermCurationAssoc(Base):
-    __tablename__ = 'term_curation_assoc'
-    term_id = Column('term_id', Integer, ForeignKey('term.id'),
-                     primary_key=True)
-    curation_id = Column('curation_id', Integer, ForeignKey('curation.id'),
-                         primary_key=True)
-    # FIXME: allow for multiple assocs for a term curation pair if metadata
-    #        type or actor is different (i.e. extend primary key)
-    #        (currently no prob b/c only canvas metadata and language split
-    #        between actors types)
-    #        when changed has to be reflected in lo['term_cur_assoc_list']
-    metadata_type = Column('metadata_type', String(255))
-    actor = Column('actor', String(255))
-    term = relationship('Term')
-    curation = relationship('Curation')
-
-
-class TermCanvasAssoc(Base):
-    __tablename__ = 'term_canvas_assoc'
-    term_id = Column('term_id', Integer, ForeignKey('term.id'),
-                     primary_key=True)
-    canvas_id = Column('canvas_id', Integer, ForeignKey('canvas.id'),
-                       primary_key=True)
-    # FIXME: allow for multiple assocs for a term canvas pair if metadata
-    #        type or actor is different (i.e. extend primary key)
-    #        (currently no prob b/c only canvas metadata and language split
-    #        between actors types)
-    #        when changed has to be reflected in lo['term_can_assoc_list']
-    metadata_type = Column('metadata_type', String(255))
-    actor = Column('actor', String(255))
-    term = relationship('Term')
-    canvas = relationship('Canvas')
-
-
-class Term(Base):
-    __tablename__ = 'term'
-    id = Column(Integer, primary_key=True)
-    term = Column(String(255))
-    qualifier = Column(String(255))
-    __table_args__ = (UniqueConstraint('term', 'qualifier'), )
-    canvases = relationship('TermCanvasAssoc')
-    curations = relationship('TermCurationAssoc')
-
-
-class Canvas(Base):
-    __tablename__ = 'canvas'
-    id = Column(Integer, primary_key=True)
-    canvas_uri = Column(String(2048), unique=True)  # ID + # [+ fragment]
-    json_string = Column(UnicodeText())
-    terms = relationship('TermCanvasAssoc')
-
-
-class Curation(Base):
-    __tablename__ = 'curation'
-    id = Column(Integer, primary_key=True)
-    curation_uri = Column(String(2048), unique=True)  # ID + term + m.d.typ.[1]
-    json_string = Column(UnicodeText())
-    terms = relationship('TermCurationAssoc')
-
-    # [1] the reason for storing each curation once per associated term is that
-    #     depending on the search term their representation as a search result
-    #     (e.g. thumbnail) is different
-    #     furthermore the type of metadata (curation top level vs. canvas) is
-    #     used to distinguish between those two kinds of search results
-
-
-class CrawlLog(Base):
-    __tablename__ = 'crawllog'
-    log_id = Column(Integer(), autoincrement=True, primary_key=True)
-    # datetime = Column(DateTime(timezone=True), server_default=func.now())
-    # ↓ saved as isoformat string to ease integration with JSONkeeper AS
-    datetime = Column(UnicodeText())
-    new_canvases = Column(Integer())
-
-
-class FacetList(Base):
-    __tablename__ = 'facetlist'
-    id = Column(Integer(), autoincrement=True, primary_key=True)
-    json_string = Column(UnicodeText())
-
-
-engine = create_engine(cfg.db_uri())
-Base.metadata.create_all(engine)
-Base.metadata.bind = engine
-DBSession = sessionmaker(bind=engine)
-session = DBSession()
 
 
 def requests_retry_session(retries=5, backoff_factor=0.2,
@@ -137,7 +46,7 @@ def build_facet_list():
         /facets path.
     """
 
-    terms = session.query(Term).join(TermCanvasAssoc)
+    terms = db.session.query(Term).join(TermCanvasAssoc)
     terms = terms.filter(TermCanvasAssoc.metadata_type == 'canvas').all()
     facet_map = {}
     for term in terms:
@@ -149,7 +58,7 @@ def build_facet_list():
     # create
     pre_facets = {}
     for label, vals in facet_map.items():
-        assocs = session.query(TermCanvasAssoc).join(Term)
+        assocs = db.session.query(TermCanvasAssoc).join(Term)
         assocs = assocs.filter(TermCanvasAssoc.metadata_type == 'canvas',
                                TermCanvasAssoc.term_id == Term.id,
                                Term.qualifier == label).all()
@@ -634,8 +543,8 @@ def index_canvases_in_cur_selection(lo,
             new_canvases += 1
             can_db = Canvas(canvas_uri=can_uri,
                          json_string=json.dumps(can_doc))
-            session.add(can_db)
-            session.flush()
+            db.session.add(can_db)
+            db.session.flush()
             lo['canvas_uri_dict'][can_uri] = can_db.id
             can_db_id = can_db.id
         else:
@@ -647,13 +556,13 @@ def index_canvases_in_cur_selection(lo,
             #       of the Curation being known or not, if it contains Canvases
             #       we already know, we just need to extend the metadata that
             #       is being associated with them.
-            can_db = session.query(Canvas).filter(
+            can_db = db.session.query(Canvas).filter(
                             Canvas.canvas_uri == can_uri).first()
             old_can_dict = json.loads(can_db.json_string)
             merged_doc = merge_iiif_doc_metadata(old_can_dict, cur_can_dict)
             can_db.json_string = json.dumps(merged_doc)
-            session.add(can_db)
-            session.flush()
+            db.session.add(can_db)
+            db.session.flush()
         # still curation metadata
         if found_top_metadata and top_cur_db and \
                 not top_doc_has_thumbnail:
@@ -674,7 +583,7 @@ def index_canvases_in_cur_selection(lo,
                                         canvas_id=can_db_id,
                                         metadata_type='curation',
                                         actor=top_actor)
-                session.add(assoc)
+                db.session.add(assoc)
 
         # canvas metadata
         log('going through canvas level metadata')
@@ -688,8 +597,8 @@ def index_canvases_in_cur_selection(lo,
                 log('creating new term {}'.format(can_term))
                 term = Term(term=can_term[1],
                             qualifier=can_term[0])
-                session.add(term)
-                session.flush()
+                db.session.add(term)
+                db.session.flush()
                 lo['term_tup_dict'][can_term] = term.id
                 can_term_id = term.id
             else:
@@ -706,7 +615,7 @@ def index_canvases_in_cur_selection(lo,
                                         canvas_id=can_db_id,
                                         metadata_type='canvas',
                                         actor=can_actor)
-                session.add(assoc)
+                db.session.add(assoc)
                 lo['term_can_assoc_list'].append(tcaa_key)
             # cur
             can_cur_uri = '{}{}{}'.format(can_cur_doc['curationUrl'],
@@ -716,8 +625,8 @@ def index_canvases_in_cur_selection(lo,
                 log('creating new canvas hit curation {}'.format(can_cur_uri))
                 can_cur_db = Curation(curation_uri=can_cur_uri,
                                       json_string=json.dumps(can_cur_doc))
-                session.add(can_cur_db)
-                session.flush()
+                db.session.add(can_cur_db)
+                db.session.flush()
                 lo['curation_uri_dict'][can_cur_uri] = can_cur_db.id
                 can_cur_id = can_cur_db.id
             else:
@@ -735,7 +644,7 @@ def index_canvases_in_cur_selection(lo,
                                           curation_id=can_cur_id,
                                           metadata_type='curation',
                                           actor=can_actor)
-                session.add(assoc)
+                db.session.add(assoc)
                 lo['term_cur_assoc_list'].append(tcua_key)
     return new_canvases
 
@@ -760,8 +669,8 @@ def process_curation_create(lo, activity):
         if top_term not in lo['term_tup_dict']:
             log('creating term {}'.format(top_term))
             term = Term(term=top_term[1], qualifier=top_term[0])
-            session.add(term)
-            session.flush()
+            db.session.add(term)
+            db.session.flush()
             lo['term_tup_dict'][top_term] = term.id
             top_term_db_id = term.id
         else:
@@ -774,8 +683,8 @@ def process_curation_create(lo, activity):
             log('creating curation {}'.format(top_cur_uri))
             top_cur_db = Curation(curation_uri=top_cur_uri,
                                   json_string=json.dumps(top_cur_doc))
-            session.add(top_cur_db)
-            session.flush()
+            db.session.add(top_cur_db)
+            db.session.flush()
             lo['curation_uri_dict'][top_cur_uri] = top_cur_db.id
             top_cur_db_id = top_cur_db.id
         else:
@@ -794,8 +703,8 @@ def process_curation_create(lo, activity):
                                       curation_id=top_cur_db_id,
                                       metadata_type='curation',
                                       actor=top_actor)
-            session.add(assoc)
-            session.flush()
+            db.session.add(assoc)
+            db.session.flush()
             lo['term_cur_assoc_list'].append(tcua_key)
         found_top_metadata = True
 
@@ -831,7 +740,7 @@ def process_curation_delete(activity):
     log(('deletion triggered through activity {}').format(activity['id']))
     # delete Curation
     cur_uri = get_attrib_uri(activity, 'object')
-    to_del = session.query(Curation).filter(
+    to_del = db.session.query(Curation).filter(
                 Curation.curation_uri.ilike('%{}%'.format(cur_uri))
                 ).all()
     if len(to_del) == 0:
@@ -839,13 +748,13 @@ def process_curation_delete(activity):
     for cur_db in to_del:
         log(('deleting curation record {} and all term associations belonging'
              'to it').format(cur_db.curation_uri))
-        session.query(TermCurationAssoc).filter(
+        db.session.query(TermCurationAssoc).filter(
                 TermCurationAssoc.curation_id == cur_db.id
                 ).delete()
-        session.query(Curation).filter(
+        db.session.query(Curation).filter(
                 Curation.id == cur_db.id
                 ).delete()
-    session.commit()
+    db.session.commit()
 
     # delete orphaned Canvases if configured
     if not cfg.allow_orphan_canvases():
@@ -874,29 +783,29 @@ def get_lookup_dict():
     log('building lookup dictionaries of existing recrods')
     # build lookup dictionaries of existing recrods
     term_tup_dict = {}
-    terms = session.query(Term).all()
+    terms = db.session.query(Term).all()
     if terms:
         for term in terms:
             term_tup_dict[(term.qualifier, term.term)] = term.id
     canvas_uri_dict = {}
-    cans = session.query(Canvas).all()
+    cans = db.session.query(Canvas).all()
     if cans:
         for can in cans:
             canvas_uri_dict[can.canvas_uri] = can.id
     curation_uri_dict = {}
-    curs = session.query(Curation).all()
+    curs = db.session.query(Curation).all()
     if curs:
         for cur in curs:
             curation_uri_dict[cur.curation_uri] = cur.id
     log('building lookup lists of existing associations')
     # build lookup lists of existing associations
     term_can_assoc_list = []
-    tcaas = session.query(TermCanvasAssoc).all()
+    tcaas = db.session.query(TermCanvasAssoc).all()
     if tcaas:
         for tcaa in tcaas:
             term_can_assoc_list.append((tcaa.term_id, tcaa.canvas_id))
     term_cur_assoc_list = []
-    tcuas = session.query(TermCurationAssoc).all()
+    tcuas = db.session.query(TermCurationAssoc).all()
     if tcuas:
         for tcua in tcuas:
             term_cur_assoc_list.append((tcua.term_id, tcua.curation_id))
@@ -936,8 +845,8 @@ def crawl_single(as_source):
     as_oc = resp.json()
     log('start iterating over Activity Stream pages')
     as_ocp = get_referenced(as_oc, 'last')
-    last_crawl = session.query(CrawlLog).order_by(desc(CrawlLog.log_id)
-                                                 ).first()
+    last_crawl = db.session.query(CrawlLog).order_by(desc(CrawlLog.log_id)
+                                                    ).first()
     new_canvases = 0
     new_activity = False
     # NOTE: seen_activity_objs is used to prevent processing obsolete
@@ -973,7 +882,7 @@ def crawl_single(as_source):
                     # TODO: possible to determine new canvases?
                 elif activity['type'] == 'Delete':
                     process_curation_delete(activity)
-                session.commit()
+                db.session.commit()
                 seen_activity_objs.append(activity['object'])
             else:
                 log('skipping')
@@ -985,20 +894,20 @@ def crawl_single(as_source):
     # persist crawl log
     crawl_log = CrawlLog(new_canvases=new_canvases,
                          datetime=datetime.datetime.utcnow().isoformat())
-    session.add(crawl_log)
-    session.commit()
+    db.session.add(crawl_log)
+    db.session.commit()
     if new_activity:
         log('generating facet list')
         # build and persist facet list
         facet_list = build_facet_list()
         log('persisting facet list')
-        db_entry = session.query(FacetList).first()
+        db_entry = db.session.query(FacetList).first()
         if not db_entry:
             db_entry = FacetList(json_string=json.dumps(facet_list))
         else:
             db_entry.json_string = json.dumps(facet_list)
-        session.add(db_entry)
-        session.commit()
+        db.session.add(db_entry)
+        db.session.commit()
     else:
         log('no changes. skipping generation of facet list')
 

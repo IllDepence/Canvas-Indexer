@@ -6,8 +6,8 @@ from flask import (abort, Blueprint, current_app, redirect, request,
                    Response, url_for, render_template)
 from util.iiif import Curation as CurationObj
 from canvasindexer.crawler.crawler import crawl
-from canvasindexer.api.models import (Term, Canvas, Curation, FacetList,
-                                      TermCanvasAssoc, TermCurationAssoc)
+from canvasindexer.models import (Term, Canvas, Curation, FacetList,
+                                  TermCanvasAssoc, TermCurationAssoc)
 
 pd = Blueprint('pd', __name__)
 
