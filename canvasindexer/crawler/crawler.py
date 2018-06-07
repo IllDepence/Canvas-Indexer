@@ -27,7 +27,7 @@ class TermCurationAssoc(Base):
     #        type or actor is different (i.e. extend primary key)
     #        (currently no prob b/c only canvas metadata and language split
     #        between actors types)
-    #        when changed has to be reflected in lo.term_cur_assoc_list
+    #        when changed has to be reflected in lo['term_cur_assoc_list']
     metadata_type = Column('metadata_type', String(255))
     actor = Column('actor', String(255))
     term = relationship('Term')
@@ -44,7 +44,7 @@ class TermCanvasAssoc(Base):
     #        type or actor is different (i.e. extend primary key)
     #        (currently no prob b/c only canvas metadata and language split
     #        between actors types)
-    #        when changed has to be reflected in lo.term_can_assoc_list
+    #        when changed has to be reflected in lo['term_can_assoc_list']
     metadata_type = Column('metadata_type', String(255))
     actor = Column('actor', String(255))
     term = relationship('Term')
@@ -103,17 +103,6 @@ Base.metadata.create_all(engine)
 Base.metadata.bind = engine
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
-
-class LookUp():
-    """ Singleton class for lookup dicts and lists.
-    """
-
-    instance = None
-    def __init__(self):
-        if not LookUp.instance:
-            LookUp.instance = self
-    def __getattr__(self, attr):
-        return getattr(LookUp.instance, attr)
 
 
 def requests_retry_session(retries=5, backoff_factor=0.2,
@@ -615,7 +604,8 @@ def log(msg):
         f.write('[{}]   {}\n'.format(timestamp, msg))
 
 
-def index_canvases_in_cur_selection(activity,
+def index_canvases_in_cur_selection(lo,
+                                    activity,
                                     cur,
                                     man,
                                     canvases,
@@ -630,7 +620,6 @@ def index_canvases_in_cur_selection(activity,
         write the resulting index entries into the DB.
     """
 
-    lo = LookUp()
     new_canvases = 0
     for cur_can_idx, cur_can_dict in enumerate(canvases):
         log('canvas #{}'.format(cur_can_idx))
@@ -640,16 +629,18 @@ def index_canvases_in_cur_selection(activity,
         can_cur_doc = build_curation_doc(cur, activity, can_doc,
                                      cur_can_idx)
         # canvas
-        if can_uri not in lo.canvas_uri_dict:
+        if can_uri not in lo['canvas_uri_dict']:
+            log('creating new canvas {}'.format(can_uri))
             new_canvases += 1
             can_db = Canvas(canvas_uri=can_uri,
                          json_string=json.dumps(can_doc))
             session.add(can_db)
             session.flush()
-            lo.canvas_uri_dict[can_uri] = can_db.id
+            lo['canvas_uri_dict'][can_uri] = can_db.id
             can_db_id = can_db.id
         else:
-            can_db_id = lo.canvas_uri_dict[can_uri]
+            log('using exiting canvas {}'.format(can_uri))
+            can_db_id = lo['canvas_uri_dict'][can_uri]
             # extend the Canvas' metadata
             # NOTE: no distinction between Create and Update here because
             #       Curations only reference Canvases in Manifests. Regardless
@@ -667,14 +658,18 @@ def index_canvases_in_cur_selection(activity,
         if found_top_metadata and top_cur_db and \
                 not top_doc_has_thumbnail:
             # enhance (cur metadata-) cur
+            log(('enhancing curation {} search result (thumbnail, etc.)'
+                ).format(top_cur_db.curation_uri))
             enhance_top_meta_curation_doc(top_cur_doc, can_doc)
             top_cur_db.json_string = json.dumps(top_cur_doc)
             top_doc_has_thumbnail = True
             # can assoc
-            tcaa_key = (lo.term_tup_dict[top_term],
-                        lo.canvas_uri_dict[can_uri])
-            if tcaa_key not in lo.term_can_assoc_list:
-                lo.term_can_assoc_list.append(tcaa_key)
+            tcaa_key = (lo['term_tup_dict'][top_term],
+                        lo['canvas_uri_dict'][can_uri])
+            if tcaa_key not in lo['term_can_assoc_list']:
+                log('associating top term {} with  canvas {}'.format(top_term,
+                                                                     can_uri))
+                lo['term_can_assoc_list'].append(tcaa_key)
                 assoc = TermCanvasAssoc(term_id=top_term_db_id,
                                         canvas_id=can_db_id,
                                         metadata_type='curation',
@@ -682,76 +677,73 @@ def index_canvases_in_cur_selection(activity,
                 session.add(assoc)
 
         # canvas metadata
+        log('going through canvas level metadata')
         for md in cur_can_dict.get('metadata', []):
             can_term = build_qualifier_tuple(md)
             if not can_term[1]:
                 # don't allow empty values
                 continue
             # term
-            if can_term not in lo.term_tup_dict:
+            if can_term not in lo['term_tup_dict']:
+                log('creating new term {}'.format(can_term))
                 term = Term(term=can_term[1],
                             qualifier=can_term[0])
                 session.add(term)
                 session.flush()
-                lo.term_tup_dict[can_term] = term.id
+                lo['term_tup_dict'][can_term] = term.id
                 can_term_id = term.id
             else:
-                can_term_id = lo.term_tup_dict[can_term]
+                log('using existing term {}'.format(can_term))
+                can_term_id = lo['term_tup_dict'][can_term]
             # can assoc
-            tcaa_key = (lo.term_tup_dict[can_term],
-                        lo.canvas_uri_dict[can_uri])
+            tcaa_key = (lo['term_tup_dict'][can_term],
+                        lo['canvas_uri_dict'][can_uri])
             can_actor = md.get('agent', 'unknown')
-            if tcaa_key not in lo.term_can_assoc_list:
+            if tcaa_key not in lo['term_can_assoc_list']:
+                log(('creating new association between {} and {}'
+                    ).format(can_term, can_uri))
                 assoc = TermCanvasAssoc(term_id=can_term_id,
                                         canvas_id=can_db_id,
                                         metadata_type='canvas',
                                         actor=can_actor)
                 session.add(assoc)
-                lo.term_can_assoc_list.append(tcaa_key)
+                lo['term_can_assoc_list'].append(tcaa_key)
             # cur
             can_cur_uri = '{}{}{}'.format(can_cur_doc['curationUrl'],
                                           can_term[1],
                                           'canvas')
-            if can_cur_uri not in lo.curation_uri_dict:
+            if can_cur_uri not in lo['curation_uri_dict']:
+                log('creating new canvas hit curation {}'.format(can_cur_uri))
                 can_cur_db = Curation(curation_uri=can_cur_uri,
                                       json_string=json.dumps(can_cur_doc))
                 session.add(can_cur_db)
                 session.flush()
-                lo.curation_uri_dict[can_cur_uri] = can_cur_db.id
+                lo['curation_uri_dict'][can_cur_uri] = can_cur_db.id
                 can_cur_id = can_cur_db.id
             else:
-                can_cur_id = lo.curation_uri_dict[can_cur_uri]
-                if activity['type'] == 'Update':
-                    # Update DB record
-                    log('Updating DB record')
-                    can_cur_db = session.query(Curation).filter(
-                                            Curation.id == can_cur_id).first()
-                    can_cur_db.json_string = json.dumps(can_cur_doc)
-                    session.add(can_cur_db)
-                    session.flush()
-                elif activity['type'] == 'Create':
-                    # nothing to do we just needed the DB ID for assocs
-                    pass
+                log(('using existing canvas hit curation {}'
+                    ).format(can_cur_uri))
+                can_cur_id = lo['curation_uri_dict'][can_cur_uri]
             # cur assoc
-            tcua_key = (lo.term_tup_dict[can_term],
-                        lo.curation_uri_dict[can_cur_uri])
+            tcua_key = (lo['term_tup_dict'][can_term],
+                        lo['curation_uri_dict'][can_cur_uri])
             can_actor = md.get('agent', 'unknown')
-            if tcua_key not in lo.term_cur_assoc_list:
+            if tcua_key not in lo['term_cur_assoc_list']:
+                log(('creating new association between {} and {}'
+                    ).format(can_term, can_cur_uri))
                 assoc = TermCurationAssoc(term_id=can_term_id,
                                           curation_id=can_cur_id,
                                           metadata_type='curation',
                                           actor=can_actor)
                 session.add(assoc)
-                lo.term_cur_assoc_list.append(tcua_key)
+                lo['term_cur_assoc_list'].append(tcua_key)
     return new_canvases
 
 
-def process_curation_create_or_update(activity):
-    """ Process a create or update activity that has a cr:Curation as its
-        object.
+def process_curation_create(lo, activity):
+    """ Process a create activity that has a cr:Curation as its object.
     """
 
-    lo = LookUp()
     new_canvases = 0
     log('retrieving curation {}'.format(activity['object']['@id']))
     cur_dict = get_referenced(activity, 'object')
@@ -765,50 +757,46 @@ def process_curation_create_or_update(activity):
             # don't allow empty values
             continue
         # term
-        if top_term not in lo.term_tup_dict:
+        if top_term not in lo['term_tup_dict']:
+            log('creating term {}'.format(top_term))
             term = Term(term=top_term[1], qualifier=top_term[0])
             session.add(term)
             session.flush()
-            lo.term_tup_dict[top_term] = term.id
+            lo['term_tup_dict'][top_term] = term.id
             top_term_db_id = term.id
         else:
-            top_term_db_id = lo.term_tup_dict[top_term]
+            log('using existing term {}'.format(top_term))
+            top_term_db_id = lo['term_tup_dict'][top_term]
         # cur
         top_cur_uri = top_cur_doc['curationUrl']+top_term[1]+'curation'
-        if top_cur_uri not in lo.curation_uri_dict:
+        if top_cur_uri not in lo['curation_uri_dict']:
             # new
+            log('creating curation {}'.format(top_cur_uri))
             top_cur_db = Curation(curation_uri=top_cur_uri,
                                   json_string=json.dumps(top_cur_doc))
             session.add(top_cur_db)
             session.flush()
-            lo.curation_uri_dict[top_cur_uri] = top_cur_db.id
+            lo['curation_uri_dict'][top_cur_uri] = top_cur_db.id
             top_cur_db_id = top_cur_db.id
         else:
             # existing
-            top_cur_db_id = lo.curation_uri_dict[top_cur_uri]
-            if activity['type'] == 'Update':
-                # Update DB record
-                log('Updating DB record')
-                top_cur_db = session.query(Curation).filter(
-                                        Curation.id == top_cur_db_id).first()
-                top_cur_db.json_string = json.dumps(top_cur_doc)
-                session.add(top_cur_db)
-                session.flush()
-            elif activity['type'] == 'Create':
-                # No change to DB record needed
-                top_cur_db = None
+            log('using existing curation {}'.format(top_cur_uri))
+            top_cur_db_id = lo['curation_uri_dict'][top_cur_uri]
+            top_cur_db = None
         # cur assoc
-        tcua_key = (lo.term_tup_dict[top_term],
-                    lo.curation_uri_dict[top_cur_uri])
+        tcua_key = (lo['term_tup_dict'][top_term],
+                    lo['curation_uri_dict'][top_cur_uri])
         top_actor = md.get('agent', 'unknown')
-        if tcua_key not in lo.term_cur_assoc_list:
+        if tcua_key not in lo['term_cur_assoc_list']:
+            log(('creating new association between {} and {}'
+                ).format(top_term, top_cur_uri))
             assoc = TermCurationAssoc(term_id=top_term_db_id,
                                       curation_id=top_cur_db_id,
                                       metadata_type='curation',
                                       actor=top_actor)
             session.add(assoc)
             session.flush()
-            lo.term_cur_assoc_list.append(tcua_key)
+            lo['term_cur_assoc_list'].append(tcua_key)
         found_top_metadata = True
 
     top_doc_has_thumbnail = False
@@ -820,7 +808,8 @@ def process_curation_create_or_update(activity):
         log('processing {} canvases'.format(todo))
 
         canvases = ran.get('members', []) + ran.get('canvases', [])
-        new_canvases += index_canvases_in_cur_selection(activity,
+        new_canvases += index_canvases_in_cur_selection(lo,
+                                                activity,
                                                 cur_dict,
                                                 man,
                                                 canvases,
@@ -839,12 +828,16 @@ def process_curation_delete(activity):
     """ Process a delete activity that has a cr:Curation as its object.
     """
 
+    log(('deletion triggered through activity {}').format(activity['id']))
+    # delete Curation
     cur_uri = get_attrib_uri(activity, 'object')
     to_del = session.query(Curation).filter(
                 Curation.curation_uri.ilike('%{}%'.format(cur_uri))
                 ).all()
+    if len(to_del) == 0:
+        log('nothing to delete')
     for cur_db in to_del:
-        log(('Deleting curation record {} and all term associations belonging'
+        log(('deleting curation record {} and all term associations belonging'
              'to it').format(cur_db.curation_uri))
         session.query(TermCurationAssoc).filter(
                 TermCurationAssoc.curation_id == cur_db.id
@@ -854,13 +847,19 @@ def process_curation_delete(activity):
                 ).delete()
     session.commit()
 
+    # delete orphaned Canvases if configured
+    if not cfg.allow_orphan_canvases():
+        pass # FIXME: implement
+        # - obtain Cur
+        # - get contained Caonvas cutouts
+        # - go through DB and delete
 
-def populate_lookup_instance():
-    """ Populate the LookUp singleton with all records already indexed. This is
-        used during crawling to see if a record for a given identifier (e.g.
-        the label + value for a metadata entry) already exists, and if so,
-        provide the DB ID it was given to create new associations (e.g. with
-        Canvases).
+
+def get_lookup_dict():
+    """ Create a dictionary for records already indexed. This is used during
+        crawling to see if a record for a given identifier (e.g. the label +
+        value for a metadata entry) already exists, and if so, provide the DB
+        ID it was given to create new associations (e.g. with Canvases).
     """
 
     log('building lookup dictionaries of existing recrods')
@@ -892,12 +891,13 @@ def populate_lookup_instance():
     if tcuas:
         for tcua in tcuas:
             term_cur_assoc_list.append((tcua.term_id, tcua.curation_id))
-    lo = LookUp()
-    lo.term_tup_dict = term_tup_dict
-    lo.canvas_uri_dict = canvas_uri_dict
-    lo.curation_uri_dict = curation_uri_dict
-    lo.term_can_assoc_list = term_can_assoc_list
-    lo.term_cur_assoc_list = term_cur_assoc_list
+    lo = {}
+    lo['term_tup_dict'] = term_tup_dict
+    lo['canvas_uri_dict'] = canvas_uri_dict
+    lo['curation_uri_dict'] = curation_uri_dict
+    lo['term_can_assoc_list'] = term_can_assoc_list
+    lo['term_cur_assoc_list'] = term_cur_assoc_list
+    return lo
 
 
 def crawl_single(as_source):
@@ -905,7 +905,7 @@ def crawl_single(as_source):
     """
 
     log('- - - - - - - - - - START - - - - - - - - - -')
-    populate_lookup_instance()
+    lo = get_lookup_dict()
 
     log('retrieving Activity Stream')
     try:
@@ -955,8 +955,13 @@ def crawl_single(as_source):
                     activity['object']['@type'] == 'cr:Curation' and \
                     activity['object'] not in seen_activity_objs:
                 new_activity = True
-                if activity['type'] in ['Create', 'Update']:
-                    new_canvases += process_curation_create_or_update(activity)
+                if activity['type'] == 'Create':
+                    new_canvases += process_curation_create(lo, activity)
+                elif activity['type'] == 'Update':
+                    process_curation_delete(activity)
+                    lo = get_lookup_dict()
+                    process_curation_create(lo, activity)
+                    # TODO: possible to determine new canvases?
                 elif activity['type'] == 'Delete':
                     process_curation_delete(activity)
                 session.commit()

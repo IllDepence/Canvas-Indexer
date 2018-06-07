@@ -24,6 +24,7 @@ shared | db\_uri | sqlite:////tmp/ci\_tmp.db | a [SQLAlchemy database URI](http:
 crawler | as\_sources | [] | comma seperated list of links to [Activity Streams](https://www.w3.org/TR/activitystreams-core/) in form of OrderedCollections
 &zwnj; | interval | 3600 | crawl interval in seconds (value <=0 deactivates automatic crawling)
 &zwnj; | log\_file | /tmp/ci\_crawl\_log.txt | file system path to where the crawling details should be logged
+&zwnj; | allow\_orphan\_canvases | false | set whether or not Canvases, that are not associated with any parent elements in the index anymore, should still appear in search results
 api | facet\_label\_sort\_top | [] | comma seperated list defining the beginning of the list returned for the `/facets` endpoint
 &zwnj; | facet\_label\_sort\_bottom | [] | comma seperated list defining the end of the list returned for the `/facets` endpoint
 &zwnj; | facet\_value\_sort\_frequency | [] | comma seperated list of facets to be sorted by frequency

@@ -33,6 +33,9 @@ class Cfg():
     def crawler_log_file(self):
         return self.cfg['crawler_log_file']
 
+    def allow_orphan_canvases(self):
+        return self.cfg['allow_orphan_canvases']
+
     def facet_label_sort_top(self):
         return self.cfg['facet_label_sort_top']
 
@@ -55,6 +58,7 @@ class Cfg():
         cfg['as_sources'] = []
         cfg['crawler_interval'] = 3600
         cfg['crawler_log_file'] = '/tmp/ci_crawl_log.txt'
+        cfg['allow_orphan_canvases'] = False
         cfg['facet_label_sort_top'] = []
         cfg['facet_label_sort_bottom'] = []
         cfg['facet_value_sort_frequency'] = []
@@ -90,6 +94,9 @@ class Cfg():
             crawler_log_file = cp['crawler'].get('log_file', False)
             if crawler_log_file and len(crawler_log_file) > 0:
                 cfg['crawler_log_file'] = crawler_log_file
+            if cp['crawler'].get('allow_orphan_canvases'):
+                cfg['allow_orphan_canvases'] = cp['crawler'].getboolean(
+                                                    'allow_orphan_canvases')
         # Sorting of API responses
         if 'api' in cp.sections():
             sort_options = ['facet_label_sort_top',
