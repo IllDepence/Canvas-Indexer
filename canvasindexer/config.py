@@ -51,6 +51,16 @@ class Cfg():
     def custom_value_sorts(self):
         return self.cfg['custom_value_sorts']
 
+    def e_term(self):
+        """ Return a placeholder term that will be associated with all
+            documents to ensure documents w/o any metadata (yet) will also be
+            indexed. (In the current implementation indexing is dependent on
+            metadata because we directly store search results in the index,
+            which can differ depending on the associated metadata.)
+        """
+
+        return '<e‌m‌p‌t‌y>'
+
     def _get_default_config(self):
         # later read from config file
         cfg = {}

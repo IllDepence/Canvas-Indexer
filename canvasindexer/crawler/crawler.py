@@ -457,6 +457,17 @@ def build_qualifier_tuple(something):
     return ('', '{}'.format(something))
 
 
+def get_metadata_actor(something):
+    """ Try to get actor/agent information from a piece of metadata.
+    """
+
+    fail = 'unknown'
+    ret = fail
+    if type(something) == dict:
+        ret = something.get('agent', fail)
+    return ret
+
+
 def merge_iiif_doc_metadata(old_doc, new_doc):
     """ Given two IIIF documents (e.g. Canvases) as dictionaries, merge the
         contents of their `metadata` attribute on the root level.
@@ -587,8 +598,8 @@ def index_canvases_in_cur_selection(lo,
 
         # canvas metadata
         log('going through canvas level metadata')
-        for md in cur_can_dict.get('metadata', []):
-            can_term = build_qualifier_tuple(md)
+        for can_md in cur_can_dict.get('metadata', []) + [cfg.e_term()]:
+            can_term = build_qualifier_tuple(can_md)
             if not can_term[1]:
                 # don't allow empty values
                 continue
@@ -607,7 +618,7 @@ def index_canvases_in_cur_selection(lo,
             # can assoc
             tcaa_key = (lo['term_tup_dict'][can_term],
                         lo['canvas_uri_dict'][can_uri])
-            can_actor = md.get('agent', 'unknown')
+            can_actor = get_metadata_actor(can_md)
             if tcaa_key not in lo['term_can_assoc_list']:
                 log(('creating new association between {} and {}'
                     ).format(can_term, can_uri))
@@ -636,7 +647,7 @@ def index_canvases_in_cur_selection(lo,
             # cur assoc
             tcua_key = (lo['term_tup_dict'][can_term],
                         lo['curation_uri_dict'][can_cur_uri])
-            can_actor = md.get('agent', 'unknown')
+            can_actor = get_metadata_actor(can_md)
             if tcua_key not in lo['term_cur_assoc_list']:
                 log(('creating new association between {} and {}'
                     ).format(can_term, can_cur_uri))
@@ -660,8 +671,8 @@ def process_curation_create(lo, activity):
     found_top_metadata = False
     log('going through top level metadata')
     # curation metadata
-    for md in cur_dict.get('metadata', []):
-        top_term = build_qualifier_tuple(md)
+    for cur_md in cur_dict.get('metadata', []) + [cfg.e_term()]:
+        top_term = build_qualifier_tuple(cur_md)
         if not top_term[1]:
             # don't allow empty values
             continue
@@ -695,7 +706,7 @@ def process_curation_create(lo, activity):
         # cur assoc
         tcua_key = (lo['term_tup_dict'][top_term],
                     lo['curation_uri_dict'][top_cur_uri])
-        top_actor = md.get('agent', 'unknown')
+        top_actor = get_metadata_actor(cur_md)
         if tcua_key not in lo['term_cur_assoc_list']:
             log(('creating new association between {} and {}'
                 ).format(top_term, top_cur_uri))
