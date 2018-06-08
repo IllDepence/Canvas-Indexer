@@ -84,3 +84,9 @@ class FacetList(db.Model):
     __tablename__ = 'facetlist'
     id = db.Column(db.Integer(), autoincrement=True, primary_key=True)
     json_string = db.Column(db.UnicodeText())
+
+
+class CanvasParentMap(db.Model):
+    __tablename__ = 'canvasparentmap'
+    id = db.Column(db.Integer(), autoincrement=True, primary_key=True)
+    json_string = db.Column(db.UnicodeText())

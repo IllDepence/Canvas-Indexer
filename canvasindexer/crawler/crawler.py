@@ -7,7 +7,8 @@ from collections import OrderedDict
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from canvasindexer.models import (db, Term, Canvas, Curation, FacetList,
-                                  TermCanvasAssoc, TermCurationAssoc, CrawlLog)
+                                  TermCanvasAssoc, TermCurationAssoc, CrawlLog,
+                                  CanvasParentMap)
 from sqlalchemy import desc
 from canvasindexer.config import Cfg
 
@@ -525,6 +526,7 @@ def log(msg):
 
 
 def index_canvases_in_cur_selection(lo,
+                                    cp_map,
                                     activity,
                                     cur,
                                     man,
@@ -548,6 +550,17 @@ def index_canvases_in_cur_selection(lo,
         can_uri = '{}#{}'.format(can_doc['canvasId'], can_doc['fragment'])
         can_cur_doc = build_curation_doc(cur, activity, can_doc,
                                      cur_can_idx)
+        # Canvas parent map
+        # # forward
+        if can_uri not in cp_map['forward']:
+            cp_map['forward'][can_uri] = []
+        if can_cur_doc['curationUrl'] not in cp_map['forward'][can_uri]:
+            cp_map['forward'][can_uri].append(can_cur_doc['curationUrl'])
+        # # backward
+        if can_cur_doc['curationUrl'] not in cp_map['backward']:
+            cp_map['backward'][can_cur_doc['curationUrl']] = []
+        if can_uri not in cp_map['backward'][can_cur_doc['curationUrl']]:
+            cp_map['backward'][can_cur_doc['curationUrl']].append(can_uri)
         # canvas
         if can_uri not in lo['canvas_uri_dict']:
             log('creating new canvas {}'.format(can_uri))
@@ -660,7 +673,7 @@ def index_canvases_in_cur_selection(lo,
     return new_canvases
 
 
-def process_curation_create(lo, activity):
+def process_curation_create(lo, cp_map, activity):
     """ Process a create activity that has a cr:Curation as its object.
     """
 
@@ -729,6 +742,7 @@ def process_curation_create(lo, activity):
 
         canvases = ran.get('members', []) + ran.get('canvases', [])
         new_canvases += index_canvases_in_cur_selection(lo,
+                                                cp_map,
                                                 activity,
                                                 cur_dict,
                                                 man,
@@ -744,7 +758,7 @@ def process_curation_create(lo, activity):
     return new_canvases
 
 
-def process_curation_delete(activity):
+def process_curation_delete(cp_map, activity):
     """ Process a delete activity that has a cr:Curation as its object.
     """
 
@@ -769,19 +783,30 @@ def process_curation_delete(activity):
 
     # delete orphaned Canvases if configured
     if not cfg.allow_orphan_canvases():
-        pass
-        # cur_dict = get_referenced(activity, 'object')
-        # for ran in cur_dict.get('selections', []):
-        #     for can in  ran.get('members', []) + ran.get('canvases', [])
-        #         url_parts = can['@id'].split('#')
-        #         can_id = url_parts[0]
-        #         if len(url_parts) == 2:
-        #             fragment = url_parts[1]
-        #         else:
-        #             fragment = ''
-        #         can_uri = '{}#{}'.format(can_id, fragment)
-        #         # need for cur->can assoc here
-        # TODO: implement
+        to_del_uris = list(cp_map['backward'][cur_uri])  # copy
+        for can_uri in to_del_uris:
+            try:
+                cp_map['forward'][can_uri].remove(cur_uri)
+                cp_map['backward'][cur_uri].remove(can_uri)
+            except ValueError as e:
+                log(('tried to delete parent entry {} for canvas {} but co'
+                     'uld not find it in the canvas parent map'
+                     ).format(cur_uri, can_uri))
+            if len(cp_map['forward'][can_uri]) == 0:
+                log(('deleting canvas record {} and all term associations belo'
+                     'nging to it because it was orphaned').format(can_uri))
+                can_db = db.session.query(Canvas).filter(
+                            Canvas.canvas_uri == can_uri
+                            ).first()
+                db.session.query(TermCanvasAssoc).filter(
+                        TermCanvasAssoc.canvas_id == can_db.id
+                        ).delete()
+                db.session.query(Canvas).filter(
+                        Canvas.id == can_db.id
+                        ).delete()
+            else:
+                log(('record {} still has {} parent(s) left. not deleting'
+                    ).format(can_uri, len(cp_map['forward'][can_uri])))
 
 
 def get_lookup_dict():
@@ -829,12 +854,9 @@ def get_lookup_dict():
     return lo
 
 
-def crawl_single(as_source):
+def crawl_single(lo, cp_map, as_source):
     """ Crawl, given a URL to an Activity Stream
     """
-
-    log('- - - - - - - - - - START - - - - - - - - - -')
-    lo = get_lookup_dict()
 
     log('retrieving Activity Stream')
     try:
@@ -885,14 +907,15 @@ def crawl_single(as_source):
                     activity['object'] not in seen_activity_objs:
                 new_activity = True
                 if activity['type'] == 'Create':
-                    new_canvases += process_curation_create(lo, activity)
+                    new_canvases += process_curation_create(lo, cp_map,
+                                                            activity)
                 elif activity['type'] == 'Update':
-                    process_curation_delete(activity)
+                    process_curation_delete(cp_map, activity)
                     lo = get_lookup_dict()
-                    process_curation_create(lo, activity)
+                    process_curation_create(lo, cp_map, activity)
                     # TODO: possible to determine new canvases?
                 elif activity['type'] == 'Delete':
-                    process_curation_delete(activity)
+                    process_curation_delete(cp_map, activity)
                 db.session.commit()
                 seen_activity_objs.append(activity['object'])
             else:
@@ -929,5 +952,23 @@ def crawl():
     """ Crawl all Activity Streams set in the config.
     """
 
+    log('- - - - - - - - - - START - - - - - - - - - -')
+    # prepare DB ID lookup structures
+    lo = get_lookup_dict()
+
+    # prepare Canvas parent map
+    cp_map_db = db.session.query(CanvasParentMap).first()
+    if cp_map_db:
+        cp_map = json.loads(cp_map_db.json_string)
+    else:
+        cp_map = {'forward':{}, 'backward':{}}
+        cp_map_db = CanvasParentMap(json_string=json.dumps(cp_map))
+
+    # crawl
     for as_source in cfg.as_sources():
-        crawl_single(as_source)
+        crawl_single(lo, cp_map, as_source)
+
+    # store Canvas parent map
+    cp_map_db.json_string = json.dumps(cp_map)
+    db.session.add(cp_map_db)
+    db.session.commit()
