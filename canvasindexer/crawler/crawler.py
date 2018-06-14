@@ -574,12 +574,6 @@ def index_canvases_in_cur_selection(lo,
         else:
             log('using exiting canvas {}'.format(can_uri))
             can_db_id = lo['canvas_uri_dict'][can_uri]
-            # extend the Canvas' metadata
-            # NOTE: no distinction between Create and Update here because
-            #       Curations only reference Canvases in Manifests. Regardless
-            #       of the Curation being known or not, if it contains Canvases
-            #       we already know, we just need to extend the metadata that
-            #       is being associated with them.
             can_db = db.session.query(Canvas).filter(
                             Canvas.canvas_uri == can_uri).first()
             old_can_dict = json.loads(can_db.json_string)

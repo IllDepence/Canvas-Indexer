@@ -90,3 +90,11 @@ class CanvasParentMap(db.Model):
     __tablename__ = 'canvasparentmap'
     id = db.Column(db.Integer(), autoincrement=True, primary_key=True)
     json_string = db.Column(db.UnicodeText())
+
+
+class BotState(db.Model):
+    __tablename__ = 'botstate'
+    id = db.Column(db.Integer(), autoincrement=True, primary_key=True)
+    bot_url = db.Column(db.String(2048), unique=True)
+    waiting_job_id = db.Column(db.Integer())
+    finished_canvases = db.Column(db.UnicodeText())
