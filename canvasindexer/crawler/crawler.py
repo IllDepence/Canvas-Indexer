@@ -551,16 +551,16 @@ def index_canvases_in_cur_selection(lo,
         can_cur_doc = build_curation_doc(cur, activity, can_doc,
                                      cur_can_idx)
         # Canvas parent map
-        # # forward
-        if can_uri not in cp_map['forward']:
-            cp_map['forward'][can_uri] = []
-        if can_cur_doc['curationUrl'] not in cp_map['forward'][can_uri]:
-            cp_map['forward'][can_uri].append(can_cur_doc['curationUrl'])
-        # # backward
-        if can_cur_doc['curationUrl'] not in cp_map['backward']:
-            cp_map['backward'][can_cur_doc['curationUrl']] = []
-        if can_uri not in cp_map['backward'][can_cur_doc['curationUrl']]:
-            cp_map['backward'][can_cur_doc['curationUrl']].append(can_uri)
+        # # upward
+        if can_uri not in cp_map['upward']:
+            cp_map['upward'][can_uri] = []
+        if can_cur_doc['curationUrl'] not in cp_map['upward'][can_uri]:
+            cp_map['upward'][can_uri].append(can_cur_doc['curationUrl'])
+        # # downward
+        if can_cur_doc['curationUrl'] not in cp_map['downward']:
+            cp_map['downward'][can_cur_doc['curationUrl']] = []
+        if can_uri not in cp_map['downward'][can_cur_doc['curationUrl']]:
+            cp_map['downward'][can_cur_doc['curationUrl']].append(can_uri)
         # canvas
         if can_uri not in lo['canvas_uri_dict']:
             log('creating new canvas {}'.format(can_uri))
@@ -782,17 +782,18 @@ def process_curation_delete(cp_map, activity):
     db.session.commit()
 
     # delete orphaned Canvases if configured
-    if not cfg.allow_orphan_canvases():
-        to_del_uris = list(cp_map['backward'][cur_uri])  # copy
+    if not cfg.allow_orphan_canvases() and \
+            cur_uri in cp_map['downward']:
+        to_del_uris = list(cp_map['downward'][cur_uri])  # copy
         for can_uri in to_del_uris:
             try:
-                cp_map['forward'][can_uri].remove(cur_uri)
-                cp_map['backward'][cur_uri].remove(can_uri)
+                cp_map['upward'][can_uri].remove(cur_uri)
+                cp_map['downward'][cur_uri].remove(can_uri)
             except ValueError as e:
                 log(('tried to delete parent entry {} for canvas {} but co'
                      'uld not find it in the canvas parent map'
                      ).format(cur_uri, can_uri))
-            if len(cp_map['forward'][can_uri]) == 0:
+            if len(cp_map['upward'][can_uri]) == 0:
                 log(('deleting canvas record {} and all term associations belo'
                      'nging to it because it was orphaned').format(can_uri))
                 can_db = db.session.query(Canvas).filter(
@@ -806,7 +807,7 @@ def process_curation_delete(cp_map, activity):
                         ).delete()
             else:
                 log(('record {} still has {} parent(s) left. not deleting'
-                    ).format(can_uri, len(cp_map['forward'][can_uri])))
+                    ).format(can_uri, len(cp_map['upward'][can_uri])))
 
 
 def get_lookup_dict():
@@ -961,7 +962,7 @@ def crawl():
     if cp_map_db:
         cp_map = json.loads(cp_map_db.json_string)
     else:
-        cp_map = {'forward':{}, 'backward':{}}
+        cp_map = {'upward':{}, 'downward':{}}
         cp_map_db = CanvasParentMap(json_string=json.dumps(cp_map))
 
     # crawl

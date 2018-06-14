@@ -7,7 +7,8 @@ from flask import (abort, Blueprint, current_app, redirect, request,
 from util.iiif import Curation as CurationObj
 from canvasindexer.crawler.crawler import crawl
 from canvasindexer.models import (Term, Canvas, Curation, FacetList,
-                                  TermCanvasAssoc, TermCurationAssoc)
+                                  TermCanvasAssoc, TermCurationAssoc,
+                                  CanvasParentMap)
 
 pd = Blueprint('pd', __name__)
 
@@ -289,6 +290,46 @@ def crawl_endpoint():
     crawl()
 
     ret = {'message': 'done'}
+    resp = Response(json.dumps(ret, indent=4))
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
+@pd.route('/parents', methods=['GET'])
+def parents():
+    """ List a Canvas' parent documents.
+
+        Note: currently only Curations because Manifests aren't crawled yet.
+    """
+
+    ret = OrderedDict()
+    ret['canvas'] = None,
+    ret['xywh'] = None,
+    ret['parents'] = []
+    canvas = request.args.get('canvas', None)
+    xywh = request.args.get('xywh', None)
+    if canvas:
+        ret['canvas'] = canvas
+        ret['xywh'] = xywh
+        cp_map_db = CanvasParentMap.query.first()
+        if cp_map_db:
+            cp_map = json.loads(cp_map_db.json_string)
+        else:
+            cp_map = {'upward':{}, 'downward':{}}
+        if xywh:
+            needle = '{}#xywh={}'.format(canvas, xywh)
+            haystack = cp_map['upward']
+        else:
+            needle = '{}#'.format(canvas)
+            haystack = {
+                        key.split('xywh')[0]: val
+                        for (key, val)
+                        in cp_map['upward'].items()
+                       }
+        if needle in haystack:
+            ret['parents'] = haystack[needle]
+
+
     resp = Response(json.dumps(ret, indent=4))
     resp.headers['Content-Type'] = 'application/json'
     return resp
