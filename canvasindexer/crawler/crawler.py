@@ -9,7 +9,7 @@ from requests.packages.urllib3.util.retry import Retry
 from canvasindexer.models import (db, Term, Canvas, Curation, FacetList,
                                   TermCanvasAssoc, TermCurationAssoc, CrawlLog,
                                   CanvasParentMap)
-from sqlalchemy import desc
+from sqlalchemy import desc, not_
 from canvasindexer.config import Cfg
 
 cfg = Cfg()
@@ -47,7 +47,8 @@ def build_facet_list():
         /facets path.
     """
 
-    terms = db.session.query(Term).join(TermCanvasAssoc)
+    terms = db.session.query(Term).filter(not_(Term.term == cfg.e_term()))
+    terms = terms.join(TermCanvasAssoc)
     terms = terms.filter(TermCanvasAssoc.metadata_type == 'canvas').all()
     facet_map = {}
     for term in terms:

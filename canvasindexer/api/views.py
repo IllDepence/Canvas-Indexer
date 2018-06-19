@@ -9,6 +9,7 @@ from canvasindexer.crawler.crawler import crawl
 from canvasindexer.models import (Term, Canvas, Curation, FacetList,
                                   TermCanvasAssoc, TermCurationAssoc,
                                   CanvasParentMap)
+from sqlalchemy import not_
 
 pd = Blueprint('pd', __name__)
 
@@ -162,7 +163,8 @@ def api():
     # filter records
     docs = Doc.query
     assocs = Assoc.query
-    terms = Term.query
+    terms = Term.query.filter(not_(Term.term == current_app.cfg.e_term()))
+
     if vrom not in ['curation,canvas', 'canvas,curation']:
         assocs = assocs.filter(Assoc.metadata_type == vrom)
     if where_agent in ['human,machine', 'machine,human']:
