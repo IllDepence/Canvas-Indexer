@@ -6,6 +6,7 @@ from flask import (abort, Blueprint, current_app, redirect, request,
                    Response, url_for, render_template)
 from util.iiif import Curation as CurationObj
 from canvasindexer.crawler.crawler import crawl
+from canvasindexer.crawler.enhancer import post_job, enhance
 from canvasindexer.models import (Term, Canvas, Curation, FacetList,
                                   TermCanvasAssoc, TermCurationAssoc,
                                   CanvasParentMap)
