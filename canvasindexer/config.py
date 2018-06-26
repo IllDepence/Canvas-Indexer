@@ -51,6 +51,10 @@ class Cfg():
     def custom_value_sorts(self):
         return self.cfg['custom_value_sorts']
 
+    def serv_url(self):
+        # TODO: implement for bot integration callbacks
+        return '# TODO: implement'
+
     def e_term(self):
         """ Return a placeholder term that will be associated with all
             documents to ensure documents w/o any metadata (yet) will also be

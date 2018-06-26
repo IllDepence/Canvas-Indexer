@@ -1,9 +1,11 @@
+import datetime
 import json
 import requests
-from canvasindexer.models import Term, Canvas, TermCanvasAssoc, BotState
+from canvasindexer.models import db, Term, Canvas, TermCanvasAssoc, BotState
 from canvasindexer.config import Cfg
 
 cfg = Cfg()
+
 
 def log(msg):
     """ Write a log message.
@@ -13,7 +15,8 @@ def log(msg):
     with open(cfg.crawler_log_file(), 'a') as f:
         f.write('[{}]   <ENHANCER> {}\n'.format(timestamp, msg))
 
-def post_job(bot_url):
+
+def post_job(bot_url, callback_url):
     """ Given a bot URL, post job with all Canvases not yet posted.
     """
 
@@ -25,7 +28,7 @@ def post_job(bot_url):
     else:
         return
     if not state_db:
-        finished_canvases=[]
+        finished_canvases = []
         state_db = BotState(bot_url=bot_url,
                             waiting_job_id=-1,
                             finished_canvases=json.dumps(finished_canvases))
@@ -42,13 +45,15 @@ def post_job(bot_url):
                 new_canvases.append(can)
 
     # prepare job
-    job = []
+    job = {}
+    job['imgs'] = []
+    job['callback_url'] = callback_url
     for can in new_canvases:
         img = {}
         img['manifest_uri'] = can['manifestUrl']
         img['canvas_uri'] = '{}#{}'.format(can['canvasId'], can['fragment'])
         img['image_url'] = can['canvasThumbnail']
-        job.append(img)
+        job['imgs'].append(img)
 
     # send job and process response
     resp = requests.post(bot_url,
@@ -57,15 +62,15 @@ def post_job(bot_url):
                          data=json.dumps(job))
     if resp.status_code != 200:
         log(('Unexpected response from bot with URL "{}". Status code: {}'
-            ).format(bot_url, resp.status_code))
+             ).format(bot_url, resp.status_code))
         return
     try:
         j_resp = resp.json()
         job_id = j_resp['job_id']
-    except json.decoder.JSONDecodeError as e:
-        log('Non-JSON response from bot with URL "{}".')
+    except json.decoder.JSONDecodeError:
+        log('Non-JSON response from bot with URL "{}".'.format(bot_url))
         return
-    except TypeError, KeyError:
+    except (TypeError, KeyError):
         log('Unexpected JSON response format from bot with URL "{}".')
         return
 
@@ -79,6 +84,7 @@ def post_job(bot_url):
     #       mechanism such that retrying is not dependent on the crawling
     #       process? (assuming a regular crawling interval this might not be
     #       necessary)
+
 
 def enhance():
     """ Function to be called from an API endpoint to which bots return
