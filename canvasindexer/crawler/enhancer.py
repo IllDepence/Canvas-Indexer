@@ -1,8 +1,10 @@
 import datetime
 import json
 import requests
+from flask import abort
 from canvasindexer.models import db, Term, Canvas, TermCanvasAssoc, BotState
 from canvasindexer.config import Cfg
+from sqlalchemy import and_
 
 cfg = Cfg()
 
@@ -35,7 +37,7 @@ def post_job(bot_url, callback_url):
         new_canvases = all_canvases
     else:
         if state_db.waiting_job_id != -1:
-            log(('Still waiting for resulst from bot. Aborting sending new job'
+            log(('Still waiting for results from bot. Aborting sending new job'
                  '.'))
             return
         finished_canvases = json.loads(state_db.finished_canvases)
@@ -75,7 +77,7 @@ def post_job(bot_url, callback_url):
         return
 
     # update bot state
-    state_db.finished_canvases = json.dumps(new_canvases)
+    state_db.finished_canvases = json.dumps(finished_canvases + new_canvases)
     state_db.waiting_job_id = job_id
     db.session.add(state_db)
     db.session.commit()
@@ -86,15 +88,50 @@ def post_job(bot_url, callback_url):
     #       necessary)
 
 
-def enhance():
+def enhance(request):
     """ Function to be called from an API endpoint to which bots return
         results.
     """
 
-    # create terms if necessary
-    # create assocs
+    json_bytes = request.data
+    try:
+        json_string = json_bytes.decode('utf-8')
+        job_result = json.loads(json_string)
+    except:
+        return abort(400, 'No valid JSON provided.')
+    if type(job_result) != dict or \
+            'job_jd' not in job_result or \
+            'results' not in job_result:
+        return abort(400, 'No valid job results provided.')
 
-    # update bot state
-    # state_db.waiting_job_id = -1
+    job_id = job_result['job_id']
+    results = job_result['results']
 
-    pass
+    # TODO: ideally check HTTP referrer against bot url
+    #       or make Canvas Indexer dictate job id in request
+    state_db = BotState.query.filter(BotState.waiting_job_id == job_id).first()
+    state_db.waiting_job_id = -1
+    db.session.add(state_db)
+    db.session.commit()
+
+    for result in results:
+        for tag in result['tags']:
+            term = Term.query.filter(and_(Term.term == tag,
+                                          Term.qualifier == 'tag')
+                                     ).first()
+            if not term:
+                term = Term(term=tag, qualifier='tag')
+                db.session.add(term)
+                db.session.flush()
+
+            canvas = Canvas.query.filter(
+                            Canvas.canvas_uri == result['canvas_uri']).first()
+            if not canvas:
+                return abort(400, 'Result for inexistent canvas.')
+
+            assoc = TermCanvasAssoc(term_id=term.id,
+                                    canvas_id=canvas.id,
+                                    metadata_type='canvas',
+                                    actor='bot')
+            db.session.add(assoc)
+    db.session.commit()

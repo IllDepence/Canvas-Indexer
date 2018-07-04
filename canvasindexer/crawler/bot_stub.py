@@ -36,7 +36,7 @@ def job():
             'callback_url' not in job_obj:
         return abort(400, 'No valid job list provided.')
 
-    job_id = random.randint(1, 999)
+    job_id = random.randint(1, 999999)
 
     # TODO: start to process and then call callback asynchronously
     #       callback(job_obj, job_id)
@@ -55,10 +55,13 @@ def callback(job_obj, job_id):
         result['manifest_uri'] = img['manifest_uri']
         results.append(result)
 
+    ret = {}
+    ret['job_id'] = job_id
+    ret['results'] = results
     resp = requests.post(job_obj['callback_url'],
                          headers={'Accept': 'application/json',
                                   'Content-Type': 'application/json'},
-                         data=json.dumps(results))
+                         data=json.dumps(ret))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
