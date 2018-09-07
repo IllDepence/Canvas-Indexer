@@ -81,14 +81,15 @@ def callback(job_obj, job_id):
 
     ret = {}
     ret['job_id'] = job_id
-    ret['results'] = result
+    ret['results'] = results
     print('sending callback request for job #{}'.format(job_id))
     resp = requests.post(job_obj['callback_url'],
                          headers={'Accept': 'application/json',
                                   'Content-Type': 'application/json'},
                          data=json.dumps(ret),
-			 timeout=60)
+                         timeout=60)
     print(resp.status_code)
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')

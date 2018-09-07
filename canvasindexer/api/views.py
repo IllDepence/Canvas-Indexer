@@ -298,6 +298,39 @@ def crawl_endpoint():
     return resp
 
 
+#@pd.route('/post_job', methods=['GET'])
+def post_job():
+    """ Testing method to manually post job to a hard coded test bot.
+    """
+
+    bot_url = 'TODO'
+    callback_url = 'TODO'
+
+    return_code = post_job(bot_url, callback_url)
+    # -2 = something went wrong
+    # -1 = bot still busy
+    #  0 = nothing to do
+    #  1 = success
+
+    ret = {'message': return_code}
+    resp = Response(json.dumps(ret, indent=4))
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
+#@pd.route('/callback', methods=['GET'])
+def callback():
+    """ Callback URL for metadata enhancing bots.
+    """
+
+    enhance(request)
+
+    ret = {'message': 'done'}
+    resp = Response(json.dumps(ret, indent=4))
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+
 @pd.route('/parents', methods=['GET'])
 def parents():
     """ List a Canvas' parent documents.

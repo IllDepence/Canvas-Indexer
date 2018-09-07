@@ -28,7 +28,7 @@ def post_job(bot_url, callback_url):
     if all_canvases_db:
         all_canvases = [json.loads(c.json_string) for c in all_canvases_db]
     else:
-        return
+        return 0
     if not state_db:
         finished_canvases = []
         state_db = BotState(bot_url=bot_url,
@@ -39,7 +39,7 @@ def post_job(bot_url, callback_url):
         if state_db.waiting_job_id != -1:
             log(('Still waiting for results from bot. Aborting sending new job'
                  '.'))
-            return
+            return -1
         finished_canvases = json.loads(state_db.finished_canvases)
         new_canvases = []
         for can in all_canvases:
@@ -65,16 +65,16 @@ def post_job(bot_url, callback_url):
     if resp.status_code != 200:
         log(('Unexpected response from bot with URL "{}". Status code: {}'
              ).format(bot_url, resp.status_code))
-        return
+        return -2
     try:
         j_resp = resp.json()
         job_id = j_resp['job_id']
     except json.decoder.JSONDecodeError:
         log('Non-JSON response from bot with URL "{}".'.format(bot_url))
-        return
+        return -2
     except (TypeError, KeyError):
         log('Unexpected JSON response format from bot with URL "{}".')
-        return
+        return -2
 
     # update bot state
     state_db.finished_canvases = json.dumps(finished_canvases + new_canvases)
@@ -86,6 +86,7 @@ def post_job(bot_url, callback_url):
     #       mechanism such that retrying is not dependent on the crawling
     #       process? (assuming a regular crawling interval this might not be
     #       necessary)
+    return 1
 
 
 def enhance(request):
