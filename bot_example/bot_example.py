@@ -7,6 +7,7 @@
 import json
 import random
 import requests
+import time
 from celery import Celery
 from flask import (abort, Flask, request, Response)
 from flask_cors import CORS
@@ -70,6 +71,8 @@ def job():
 
 @celery.task()
 def callback(job_obj, job_id):
+    time.sleep(10)  # TODO: remove
+
     results = []
     for img in job_obj['imgs']:
         result = {}

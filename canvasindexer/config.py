@@ -52,8 +52,10 @@ class Cfg():
         return self.cfg['custom_value_sorts']
 
     def serv_url(self):
-        # TODO: implement for bot integration callbacks
-        return '# TODO: implement'
+        return self.cfg['server_url']
+
+    def bot_urls(self):
+        return self.cfg['bot_urls']
 
     def e_term(self):
         """ Return a placeholder term that will be associated with all
@@ -73,6 +75,8 @@ class Cfg():
         cfg['crawler_interval'] = 3600
         cfg['crawler_log_file'] = '/tmp/ci_crawl_log.txt'
         cfg['allow_orphan_canvases'] = False
+        cfg['server_url'] = 'http://localhost:5005'
+        cfg['bot_urls'] = []
         cfg['facet_label_sort_top'] = []
         cfg['facet_label_sort_bottom'] = []
         cfg['facet_value_sort_frequency'] = []
@@ -113,6 +117,11 @@ class Cfg():
                                                     'allow_orphan_canvases')
         # Sorting of API responses
         if 'api' in cp.sections():
+            if cp['api'].get('server_url'):
+                cfg['server_url'] = cp['api'].get('server_url')
+            if cp['api'].get('bot_urls'):
+                val = cp['api'].get('bot_urls')
+                cfg['bot_urls'] = [u.strip() for u in val.split(',') if len(u) > 0]
             sort_options = ['facet_label_sort_top',
                             'facet_label_sort_bottom',
                             'facet_value_sort_frequency',

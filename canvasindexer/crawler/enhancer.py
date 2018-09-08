@@ -2,7 +2,9 @@ import datetime
 import json
 import requests
 from flask import abort
-from canvasindexer.models import db, Term, Canvas, TermCanvasAssoc, BotState
+from canvasindexer.crawler.crawler import build_facet_list
+from canvasindexer.models import (db, Term, Canvas, TermCanvasAssoc, BotState,
+                                  FacetList)
 from canvasindexer.config import Cfg
 from sqlalchemy import and_
 
@@ -54,7 +56,7 @@ def post_job(bot_url, callback_url):
         img = {}
         img['manifest_uri'] = can['manifestUrl']
         img['canvas_uri'] = '{}#{}'.format(can['canvasId'], can['fragment'])
-        img['image_url'] = can['canvasThumbnail']
+        img['img_url'] = can['canvasThumbnail']
         job['imgs'].append(img)
 
     # send job and process response
@@ -101,12 +103,14 @@ def enhance(request):
     except:
         return abort(400, 'No valid JSON provided.')
     if type(job_result) != dict or \
-            'job_jd' not in job_result or \
+            'job_id' not in job_result or \
             'results' not in job_result:
         return abort(400, 'No valid job results provided.')
 
     job_id = job_result['job_id']
     results = job_result['results']
+
+    log('Received callback for job {}.'.format(job_id))
 
     # TODO: ideally check HTTP referrer against bot url
     #       or make Canvas Indexer dictate job id in request
@@ -117,10 +121,12 @@ def enhance(request):
 
     for result in results:
         for tag in result['tags']:
+            log('Processing tag "{}".'.format(tag))
             term = Term.query.filter(and_(Term.term == tag,
                                           Term.qualifier == 'tag')
                                      ).first()
             if not term:
+                # add term if new
                 term = Term(term=tag, qualifier='tag')
                 db.session.add(term)
                 db.session.flush()
@@ -130,9 +136,30 @@ def enhance(request):
             if not canvas:
                 return abort(400, 'Result for inexistent canvas.')
 
+            # add new metadata to Canvas search result representation
+            can_dict = json.loads(canvas.json_string)
+            if not can_dict.get('metadata'):
+                can_dict['metadata'] = []
+            can_dict['metadata'].append({'label': 'tag',
+                                         'value': tag})
+            canvas.json_string = json.dumps(can_dict)
+            db.session.add(canvas)
+
+            # add term canvas assoc
             assoc = TermCanvasAssoc(term_id=term.id,
                                     canvas_id=canvas.id,
                                     metadata_type='canvas',
-                                    actor='bot')
+                                    actor='machine')
             db.session.add(assoc)
+    db.session.commit()
+    log('generating facet list')
+    # build and persist facet list
+    facet_list = build_facet_list()
+    log('persisting facet list')
+    db_entry = db.session.query(FacetList).first()
+    if not db_entry:
+        db_entry = FacetList(json_string=json.dumps(facet_list))
+    else:
+        db_entry.json_string = json.dumps(facet_list)
+    db.session.add(db_entry)
     db.session.commit()

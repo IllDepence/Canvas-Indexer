@@ -299,18 +299,20 @@ def crawl_endpoint():
 
 
 #@pd.route('/post_job', methods=['GET'])
-def post_job():
+def post_job_trigger():
     """ Testing method to manually post job to a hard coded test bot.
     """
 
-    bot_url = 'TODO'
-    callback_url = 'TODO'
+    first_bot_url = current_app.cfg.bot_urls()[0]  # TODO: do for all bots
+    bot_url = '{}{}'.format(first_bot_url, '/job')
+    callback_url = '{}{}'.format(current_app.cfg.serv_url(), '/callback')
 
     return_code = post_job(bot_url, callback_url)
     # -2 = something went wrong
     # -1 = bot still busy
     #  0 = nothing to do
     #  1 = success
+    print('return_code: {}'.format(return_code))
 
     ret = {'message': return_code}
     resp = Response(json.dumps(ret, indent=4))
@@ -318,7 +320,7 @@ def post_job():
     return resp
 
 
-#@pd.route('/callback', methods=['GET'])
+#@pd.route('/callback', methods=['POST'])
 def callback():
     """ Callback URL for metadata enhancing bots.
     """
