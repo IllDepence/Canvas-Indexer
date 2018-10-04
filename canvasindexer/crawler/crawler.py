@@ -3,6 +3,8 @@ import dateutil.parser
 import json
 import re
 import requests
+import stat
+import os
 from collections import OrderedDict
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -522,7 +524,18 @@ def log(msg):
     """
 
     timestamp = str(datetime.datetime.now()).split('.')[0]
-    with open(cfg.crawler_log_file(), 'a') as f:
+    fn = cfg.crawler_log_file()
+    # make /dev/stdout usable as log file
+    # https://www.bugs.python.org/issue27805
+    # side note: stat.S_ISCHR(os.stat(fn).st_mode) doesn't seem to work for
+    #            in an alpine linux docker container running canvas indexer
+    #            with gunicorn although manually executing it on a python shell
+    #            in the container works
+    if fn == '/dev/stdout':
+        mode = 'w'
+    else:
+        mode = 'a'
+    with open(fn, mode) as f:
         f.write('[{}]   {}\n'.format(timestamp, msg))
 
 
