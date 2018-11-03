@@ -71,7 +71,7 @@ def job():
 
 @celery.task()
 def callback(job_obj, job_id):
-    time.sleep(10)  # TODO: remove
+    time.sleep(1)  # TODO: remove
 
     results = []
     for img in job_obj['imgs']:

@@ -11,6 +11,7 @@ from requests.packages.urllib3.util.retry import Retry
 from canvasindexer.models import (db, Term, Canvas, Curation, FacetList,
                                   TermCanvasAssoc, TermCurationAssoc, CrawlLog,
                                   CanvasParentMap)
+from canvasindexer.crawler.enhancer import post_job
 from sqlalchemy import desc, not_
 from canvasindexer.config import Cfg
 
@@ -157,7 +158,7 @@ def custom_sort(dictionary, sort_top_labels, sort_bottom_labels):
 
         and two lists (for top and bottom)
 
-            ['<a_label', 'c_label', 'b_label', ...]
+            ['<a_label>', '<c_label>', '<b_label>', ...]
 
         return a list of the dictonaries values ordered
 
@@ -314,7 +315,7 @@ def build_canvas_doc(man, cur_can):
                 except Exception as e:
                     log(('Could not get info.json at {}.'
                          ' Error {}.').format(
-                        url,
+                        info_url,
                         e.__class__.__name__
                         )
                     )
@@ -527,10 +528,10 @@ def log(msg):
     fn = cfg.crawler_log_file()
     # make /dev/stdout usable as log file
     # https://www.bugs.python.org/issue27805
-    # side note: stat.S_ISCHR(os.stat(fn).st_mode) doesn't seem to work for
-    #            in an alpine linux docker container running canvas indexer
-    #            with gunicorn although manually executing it on a python shell
-    #            in the container works
+    # side note: stat.S_ISCHR(os.stat(fn).st_mode) doesn't seem to work in an
+    #            alpine linux docker container running canvas indexer with
+    #            gunicorn although manually executing it on a python shell in
+    #            the container works
     if fn == '/dev/stdout':
         mode = 'w'
     else:
@@ -940,6 +941,8 @@ def crawl_single(lo, cp_map, as_source):
     db.session.add(crawl_log)
     db.session.commit()
     if new_activity:
+        # call bots (if configured)
+        post_bot_jobs()
         log('generating facet list')
         # build and persist facet list
         facet_list = build_facet_list()
@@ -957,27 +960,65 @@ def crawl_single(lo, cp_map, as_source):
     log('- - - - - - - - - - END - - - - - - - - - -')
 
 
+def post_bot_jobs():
+    # trigger job post to bost (in case new Canvases were craweld)
+    for bot_url in cfg.bot_urls():
+        post_url = '{}{}'.format(bot_url, '/job')
+        callback_url = '{}{}'.format(cfg.serv_url(), '/callback')
+
+        return_code = post_job(post_url, callback_url)
+        #  1 = success
+        #  0 = nothing to do
+        # -1 = bot still busy
+        # -2 = something went wrong
+        log('posted job to "{}"'.format(post_url))
+        if return_code == 1:
+            log('success')
+        elif return_code == 0:
+            log('nothing to do')
+        elif return_code == -1:
+            log('bot is still busy')
+        elif return_code == -2:
+            log('failed for unknown reason')
+        else:
+            log('something went horribly wrong')
+
+
 def crawl():
     """ Crawl all Activity Streams set in the config.
+
+        This function does not run inside the normal Canvas Indexer app context
+        (because it is not triggered by a web request) and "therefore" looks a
+        bit messy, has imports inside it, etc.
     """
 
-    log('- - - - - - - - - - START - - - - - - - - - -')
-    # prepare DB ID lookup structures
-    lo = get_lookup_dict()
+    from flask import Flask
+    app = Flask(__name__)
+    with app.app_context():
+        cfg = Cfg()
+        app.config['SQLALCHEMY_DATABASE_URI'] = cfg.db_uri()
+        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    # prepare Canvas parent map
-    cp_map_db = db.session.query(CanvasParentMap).first()
-    if cp_map_db:
-        cp_map = json.loads(cp_map_db.json_string)
-    else:
-        cp_map = {'upward':{}, 'downward':{}}
-        cp_map_db = CanvasParentMap(json_string=json.dumps(cp_map))
+        from canvasindexer.models import db
+        db.init_app(app)
+        db.create_all()
+        log('- - - - - - - - - - START - - - - - - - - - -')
+        # prepare DB ID lookup structures
+        lo = get_lookup_dict()
 
-    # crawl
-    for as_source in cfg.as_sources():
-        crawl_single(lo, cp_map, as_source)
+        # prepare Canvas parent map
+        cp_map_db = db.session.query(CanvasParentMap).first()
+        if cp_map_db:
+            cp_map = json.loads(cp_map_db.json_string)
+        else:
+            cp_map = {'upward':{}, 'downward':{}}
+            cp_map_db = CanvasParentMap(json_string=json.dumps(cp_map))
 
-    # store Canvas parent map
-    cp_map_db.json_string = json.dumps(cp_map)
-    db.session.add(cp_map_db)
-    db.session.commit()
+        # crawl
+        for as_source in cfg.as_sources():
+            crawl_single(lo, cp_map, as_source)
+
+        # store Canvas parent map
+        cp_map_db.json_string = json.dumps(cp_map)
+        db.session.add(cp_map_db)
+        db.session.commit()

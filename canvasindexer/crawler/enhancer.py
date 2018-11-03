@@ -2,9 +2,7 @@ import datetime
 import json
 import requests
 from flask import abort
-from canvasindexer.crawler.crawler import build_facet_list
-from canvasindexer.models import (db, Term, Canvas, TermCanvasAssoc, BotState,
-                                  FacetList)
+from canvasindexer.models import db, Term, Canvas, TermCanvasAssoc, BotState
 from canvasindexer.config import Cfg
 from sqlalchemy import and_
 
@@ -27,32 +25,36 @@ def post_job(bot_url, callback_url):
     # get bot state
     state_db = BotState.query.filter(BotState.bot_url == bot_url).first()
     all_canvases_db = Canvas.query.all()
-    if all_canvases_db:
-        all_canvases = [json.loads(c.json_string) for c in all_canvases_db]
-    else:
+    if not all_canvases_db:
         return 0
     if not state_db:
-        finished_canvases = []
+        finished_canvas_uris = []
         state_db = BotState(bot_url=bot_url,
                             waiting_job_id=-1,
-                            finished_canvases=json.dumps(finished_canvases))
-        new_canvases = all_canvases
+                            finished_canvases=json.dumps(finished_canvas_uris))
+        new_canvas_dicts = [json.loads(c.json_string) for c in all_canvases_db]
+        new_canvas_uris = [c.canvas_uri for c in all_canvases_db]
     else:
         if state_db.waiting_job_id != -1:
             log(('Still waiting for results from bot. Aborting sending new job'
                  '.'))
             return -1
-        finished_canvases = json.loads(state_db.finished_canvases)
-        new_canvases = []
-        for can in all_canvases:
-            if can.canvas_uri not in finished_canvases:
-                new_canvases.append(can)
+        finished_canvas_uris = json.loads(state_db.finished_canvases)
+        new_canvas_dicts = []
+        new_canvas_uris = []
+        for can_db in all_canvases_db:
+            if can_db.canvas_uri not in finished_canvas_uris:
+                new_canvas_dicts.append(json.loads(can_db.json_string))
+                new_canvas_uris.append(can_db.canvas_uri)
+    if len(new_canvas_uris) == 0:
+        log('No new canvases to send.')
+        return 0
 
     # prepare job
     job = {}
     job['imgs'] = []
     job['callback_url'] = callback_url
-    for can in new_canvases:
+    for can in new_canvas_dicts:
         img = {}
         img['manifest_uri'] = can['manifestUrl']
         img['canvas_uri'] = '{}#{}'.format(can['canvasId'], can['fragment'])
@@ -79,7 +81,8 @@ def post_job(bot_url, callback_url):
         return -2
 
     # update bot state
-    state_db.finished_canvases = json.dumps(finished_canvases + new_canvases)
+    state_db.finished_canvases = json.dumps(finished_canvas_uris
+                                            + new_canvas_uris)
     state_db.waiting_job_id = job_id
     db.session.add(state_db)
     db.session.commit()
@@ -119,6 +122,7 @@ def enhance(request):
     db.session.add(state_db)
     db.session.commit()
 
+    log('Got results for {} canvases.'.format(len(results)))
     for result in results:
         for tag in result['tags']:
             log('Processing tag "{}".'.format(tag))
@@ -151,15 +155,6 @@ def enhance(request):
                                     metadata_type='canvas',
                                     actor='machine')
             db.session.add(assoc)
-    db.session.commit()
-    log('generating facet list')
-    # build and persist facet list
-    facet_list = build_facet_list()
-    log('persisting facet list')
-    db_entry = db.session.query(FacetList).first()
-    if not db_entry:
-        db_entry = FacetList(json_string=json.dumps(facet_list))
-    else:
-        db_entry.json_string = json.dumps(facet_list)
-    db.session.add(db_entry)
-    db.session.commit()
+    if len(results) > 0:
+        db.session.commit()
+        log('generating facet list')

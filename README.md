@@ -25,7 +25,9 @@ crawler | as\_sources | [] | comma seperated list of links to [Activity Streams]
 &zwnj; | interval | 3600 | crawl interval in seconds (value <=0 deactivates automatic crawling)
 &zwnj; | log\_file | /tmp/ci\_crawl\_log.txt | file system path to where the crawling details should be logged
 &zwnj; | allow\_orphan\_canvases | false | set whether or not Canvases, that are not associated with any parent elements in the index anymore, should still appear in search results
-api | facet\_label\_sort\_top | [] | comma seperated list defining the beginning of the list returned for the `/facets` endpoint
+api | server\_url | http://localhost:5005 | URL under which Canvas Indexer can be accessed (only needed when using bots ([details below](#bot-integration)))
+&zwnj; | bot\_urls | [] | comma seperated list of URLs to bots (only needed when using bots ([details below](#bot-integration)))
+&zwnj; | facet\_label\_sort\_top | [] | comma seperated list defining the beginning of the list returned for the `/facets` endpoint
 &zwnj; | facet\_label\_sort\_bottom | [] | comma seperated list defining the end of the list returned for the `/facets` endpoint
 &zwnj; | facet\_value\_sort\_frequency | [] | comma seperated list of facets to be sorted by frequency
 &zwnj; | facet\_value\_sort\_alphanum | [] | comma seperated list of facets to be sorted alphanumerically
@@ -34,17 +36,6 @@ facet\_value\_sort\_<br>custom\_&lt;name&gt; | label | &zwnj; | facet label for 
 &zwnj; | sort\_bottom | &zwnj; | comma seperated list defining the end
 
 ## Run
-### Crawler
-
-    $ source venv/bin/activate
-    $ python3 run_crawler.py
-
-#### Notes
-
-* The crawler is designed to be run periodically. On its first run it will go through an Activity Stream in its entirety, subsequent runs will only regard Activities that occured *after* the previous run.
-* In its current state the crawler indexes only the label value pairs given in a IIIF resource's [metadata](http://iiif.io/api/presentation/2.1/#metadata) property.
-
-### Search API
 
     $ source venv/bin/activate
     $ python3 run.py [debug]
@@ -70,6 +61,16 @@ example: `{base_url}/api?select=canvas&from=canvas,curation&where=face`
 
 **path: `{base_url}/facets`**  
 returns a pre generated overview of the indexed metadata facets
+
+## Crawler
+
+* The crawler can be configured to run periodically (see [Config](#config)) or triggered manually by accessing `{base_url}/crawl`.
+* On its first run the crawler will go through an Activity Stream in its entirety, subsequent runs will only regard Activities that occured *after* the previous run.
+* In its current state the crawler indexes only the label value pairs given in a IIIF resource's [metadata](http://iiif.io/api/presentation/2.1/#metadata) property.
+
+## Bot integration
+
+Canvas Indexer can be set up to send image URLs of the canvases it indexes to bots that return tags. These tags are then integrated in the index. Example code of a bot can be found in the folder [bot\_example](tree/master/bot_example).
 
 - - -
 

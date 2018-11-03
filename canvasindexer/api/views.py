@@ -300,10 +300,13 @@ def crawl_endpoint():
 
 #@pd.route('/post_job', methods=['GET'])
 def post_job_trigger():
-    """ Testing method to manually post job to a hard coded test bot.
+    """ Testing method to manually post job to first configured bot.
+
+        NOTE: should you uncomment and use this route, be aware that it does
+              *not* update the facet list
     """
 
-    first_bot_url = current_app.cfg.bot_urls()[0]  # TODO: do for all bots
+    first_bot_url = current_app.cfg.bot_urls()[0]
     bot_url = '{}{}'.format(first_bot_url, '/job')
     callback_url = '{}{}'.format(current_app.cfg.serv_url(), '/callback')
 
@@ -320,7 +323,7 @@ def post_job_trigger():
     return resp
 
 
-#@pd.route('/callback', methods=['POST'])
+@pd.route('/callback', methods=['POST'])
 def callback():
     """ Callback URL for metadata enhancing bots.
     """
