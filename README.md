@@ -70,7 +70,7 @@ returns a pre generated overview of the indexed metadata facets
 
 ## Bot integration
 
-Canvas Indexer can be set up to send image URLs of the canvases it indexes to bots that return tags. These tags are then integrated in the index. Example code of a bot can be found in the folder [bot\_example](tree/master/bot_example).
+Canvas Indexer can be set up to send image URLs of the canvases it indexes to bots that return tags. These tags are then integrated in the index. Example code of a bot can be found in the folder [bot\_example](bot_example).
 
 - - -
 
