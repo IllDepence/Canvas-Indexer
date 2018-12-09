@@ -4,7 +4,7 @@ A flask web application that crawls Activity Streams for IIIF Canvases and offer
 
 ## Project state
 
-Canvas Indexer is being developed as part of the [CODH's IIIF Curation Platform](codh.rois.ac.jp/iiif-curation-platform/), *but* meant to be a general IIIF tool. Integration into the IIIF Curation Platform means that in this very early stage there is a focus on cr:Curation<sup>[1]</sup> type documents.<sup>[2]</sup> Nevertheless all development is done with generality in mind.<sup>[3]</sup>
+Canvas Indexer is being developed as part of the [CODH's IIIF Curation Platform](http://codh.rois.ac.jp/iiif-curation-platform/), *but* meant to be a general IIIF tool. Integration into the IIIF Curation Platform means that in this very early stage there is a focus on cr:Curation<sup>[1]</sup> type documents.<sup>[2]</sup> Nevertheless all development is done with generality in mind.<sup>[3]</sup>
 
 [1] `http://codh.rois.ac.jp/iiif/curation/1#Curation`  
 [2] The crawler currently only looks for canvases within them (and not, for example, sc:Manifests) and the search API offers dedicated parameters.  
