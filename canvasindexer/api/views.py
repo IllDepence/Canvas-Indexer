@@ -280,6 +280,33 @@ def api():
 
     ret['results'] = results
 
+    # retroactively transform canvas response to Curation JSON
+    # if output=cutaion
+    output_param = request.args.get('output', '')
+    if output_param == 'curation' and select == 'canvas':
+        # build curation
+        cur = CurationObj(
+            request.url,
+            'Canvas Indexer search result')
+        for i, res in enumerate(results):
+            can = cur.create_canvas(
+                '{}#{}'.format(res['canvasId'], res['fragment']),
+                label = res['canvasLabel']
+            )
+            can['metadata'] = res['metadata']
+            cur.add_and_fill_range(
+                res['manifestUrl'],
+                [can],
+                within_label = res['manifestLabel'],
+                label = 'Temporary range for displaying search results',
+                ran_id = '{}/{}/range/r{}'.format(
+                    request.url.split('?')[0],
+                    str(uuid.uuid4()),
+                    i+1
+                )
+            )
+        ret = cur.get_dict()
+
     resp = Response(json.dumps(ret, indent=4))
     resp.headers['Content-Type'] = 'application/json'
     return resp

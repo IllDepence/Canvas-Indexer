@@ -55,6 +55,7 @@ where\_metadata\_value |  | used to search by a property+value pair. requires wh
 where\_agent | `human,machine` | set the type of metadata creator to `human`, `machine` or a comma seperated list of aforementioned
 start | `0` | 0 based index from which to start listing results from the list of all results
 limit | `null` meaning no limit | limit the number of results being returned
+output | | if set to `curation` and `select=cavnas` search results will be returned as a curation
 
 example: `{base_url}/api?select=canvas&from=canvas,curation&where=face`
 

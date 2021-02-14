@@ -46,11 +46,11 @@ class Curation():
         ran['@id'] = ran_id
         ran['@type'] = 'sc:Range'
         ran['label'] = label
+        ran['members'] = []
         ran['within'] = OrderedDict()
         ran['within']['@id'] = within
         ran['within']['@type'] = 'sc:Manifest'
         ran['within']['label'] = within_label
-        ran['members'] = []
         return ran
 
     def add_and_fill_range(self, within, canvases, within_label=None,
@@ -76,7 +76,7 @@ class Curation():
         return ran['@id']
 
     def create_canvas(self, can_id, label=None):
-        """ Create a Canvas with xywh fragment. The Canvas has to be added to
+        """ Create a Canvas. The Canvas has to be added to
             a Range manually afterwards.
         """
 
