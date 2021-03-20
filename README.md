@@ -48,7 +48,7 @@ facet\_value\_sort\_<br>custom\_&lt;name&gt; | label | &zwnj; | facet label for 
     $ pip install gunicorn
     $ ./venv/bin/gunicorn 'canvasindexer:create_app()'
 
-**Note** that gunicorn per default times out requests [after 30 seconds](https://docs.gunicorn.org/en/stable/settings.html#timeout), which can interfere with long crawling procedures (e.g. the first crawl of a large Activity Stream). The timeout can be changed by creating a file `gunicorn_config.py` and inserting a line like `timeout = 3600` (for a timeout of one hour or `timeout = 0` to deactivate timeouts alltogether. To start Canvas Indexer using this config run
+**Note** that gunicorn per default times out requests [after 30 seconds](https://docs.gunicorn.org/en/stable/settings.html#timeout), which can interfere with long crawling procedures (e.g. the first crawl of a large Activity Stream). The timeout can be changed by creating a file `gunicorn_config.py` and inserting a line like `timeout = 3600` (for a timeout of one hour) or `timeout = 0` to deactivate timeouts alltogether. To start Canvas Indexer using this config run
 
     $ ./venv/bin/gunicorn -c gunicorn_config.py 'canvasindexer:create_app()'
 
