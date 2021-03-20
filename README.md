@@ -4,7 +4,7 @@ A flask web application that crawls Activity Streams for IIIF Canvases and offer
 
 ## Project state
 
-Canvas Indexer is being developed as part of the [CODH's IIIF Curation Platform](http://codh.rois.ac.jp/iiif-curation-platform/), *but* meant to be a general IIIF tool. Integration into the IIIF Curation Platform means that in this very early stage there is a focus on cr:Curation<sup>[1]</sup> type documents.<sup>[2]</sup> Nevertheless all development is done with generality in mind.<sup>[3]</sup>
+Canvas Indexer is being developed as part of the [CODH's IIIF Curation Platform](http://codh.rois.ac.jp/iiif-curation-platform/), but can also be used as a general IIIF tool. Integration into the IIIF Curation Platform means that there is a focus on cr:Curation<sup>[1]</sup> type documents.<sup>[2]</sup> Nevertheless all development is done with generality in mind.<sup>[3]</sup>
 
 [1] `http://codh.rois.ac.jp/iiif/curation/1#Curation`  
 [2] The crawler currently only looks for canvases within them (and not, for example, sc:Manifests) and the search API offers dedicated parameters.  
@@ -37,8 +37,20 @@ facet\_value\_sort\_<br>custom\_&lt;name&gt; | label | &zwnj; | facet label for 
 
 ## Run
 
+### Directly through Flask
+
     $ source venv/bin/activate
     $ python3 run.py [debug]
+
+### Using gunicorn
+
+    $ source venv/bin/activate
+    $ pip install gunicorn
+    $ ./venv/bin/gunicorn 'canvasindexer:create_app()'
+
+**Note** that gunicorn per default times out requests [after 30 seconds](https://docs.gunicorn.org/en/stable/settings.html#timeout), which can interfere with long crawling procedures (e.g. the first crawl of a large Activity Stream). The timeout can be changed by creating a file `gunicorn_config.py` and inserting a line like `timeout = 3600` (for a timeout of one hour or `timeout = 0` to deactivate timeouts alltogether. To start Canvas Indexer using this config run
+
+    $ ./venv/bin/gunicorn -c gunicorn_config.py 'canvasindexer:create_app()'
 
 ## API
 
@@ -58,6 +70,17 @@ limit | `null` meaning no limit | limit the number of results being returned
 output | | if set to `curation` and `select=cavnas` search results will be returned as a curation
 
 example: `{base_url}/api?select=canvas&from=canvas,curation&where=face`
+
+
+**path: `{base_url}/parents`**  
+returns the list of curations that contain a given canvas or canvas area
+
+arguments:
+
+arg | default | explanation
+--- | -------- | -----------
+canvas | `null` | URL encoded canvas ID
+xywh | `null` | optional xywh fragment (needs to match exactly)
 
 
 **path: `{base_url}/facets`**  
