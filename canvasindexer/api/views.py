@@ -30,6 +30,28 @@ def combine(cr1, cr2):
     return has_cur
 
 
+def get_canvas_parents(canvas, xywh):
+    parents = []
+    cp_map_db = CanvasParentMap.query.first()
+    if cp_map_db:
+        cp_map = json.loads(cp_map_db.json_string)
+    else:
+        cp_map = {'upward':{}, 'downward':{}}
+    if xywh:
+        needle = '{}#xywh={}'.format(canvas, xywh)
+        haystack = cp_map['upward']
+    else:
+        needle = '{}#'.format(canvas)
+        haystack = {
+                    key.split('xywh')[0]: val
+                    for (key, val)
+                    in cp_map['upward'].items()
+                   }
+    if needle in haystack:
+        parents = haystack[needle]
+    return parents
+
+
 @pd.route('/', methods=['GET', 'POST'])
 def index():
     """ Index page. Only accessible when running in debug mode.
@@ -265,8 +287,28 @@ def api():
                     continue
                 if limit >= 0 and i>=start+limit:
                     break
-                results.append(json.loads(doc.json_string,
-                                          object_pairs_hook=OrderedDict))
+                result = json.loads(doc.json_string,
+                                    object_pairs_hook=OrderedDict)
+                # add info on containing curations
+                result['curations'] = []
+                can_uri_c, can_uri_x = doc.canvas_uri.split('#xywh=')
+                parent_ids = get_canvas_parents(can_uri_c, can_uri_x)
+                curations_seen = []
+                for cur_id in parent_ids:
+                    pcurs_db = Curation.query.filter(Curation.curation_uri.ilike('%{}%'.format(cur_id))).all()
+                    for pcur_db in pcurs_db:
+                        pcur_j = json.loads(pcur_db.json_string)
+                        if pcur_j['curationUrl'] in curations_seen:
+                            continue
+                        if type(pcur_j['canvasHit']) == dict and \
+                               pcur_j['canvasHit']['canvasId'] == can_uri_c and \
+                               pcur_j['canvasHit']['fragment'] == 'xywh={}'.format(can_uri_x):
+                            parent = {}
+                            parent['curationUrl'] = pcur_j['curationUrl']
+                            parent['curationCanvasIndex'] = pcur_j['canvasHit']['curationCanvasIndex']
+                            result['curations'].append(parent)
+                            curations_seen.append(pcur_j['curationUrl'])
+                results.append(result)
     else:
         all_results = []
 
@@ -373,30 +415,9 @@ def parents():
     ret = OrderedDict()
     ret['canvas'] = None,
     ret['xywh'] = None,
-    ret['parents'] = []
     canvas = request.args.get('canvas', None)
     xywh = request.args.get('xywh', None)
-    if canvas:
-        ret['canvas'] = canvas
-        ret['xywh'] = xywh
-        cp_map_db = CanvasParentMap.query.first()
-        if cp_map_db:
-            cp_map = json.loads(cp_map_db.json_string)
-        else:
-            cp_map = {'upward':{}, 'downward':{}}
-        if xywh:
-            needle = '{}#xywh={}'.format(canvas, xywh)
-            haystack = cp_map['upward']
-        else:
-            needle = '{}#'.format(canvas)
-            haystack = {
-                        key.split('xywh')[0]: val
-                        for (key, val)
-                        in cp_map['upward'].items()
-                       }
-        if needle in haystack:
-            ret['parents'] = haystack[needle]
-
+    ret['parents'] = get_canvas_parents(canvas, xywh)
 
     resp = Response(json.dumps(ret, indent=4))
     resp.headers['Content-Type'] = 'application/json'
