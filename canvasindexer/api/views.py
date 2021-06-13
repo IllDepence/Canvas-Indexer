@@ -30,9 +30,10 @@ def combine(cr1, cr2):
     return has_cur
 
 
-def get_canvas_parents(canvas, xywh):
+def get_canvas_parents(canvas, xywh, cp_map_db = None):
     parents = []
-    cp_map_db = CanvasParentMap.query.first()
+    if not cp_map_db:
+        cp_map_db = CanvasParentMap.query.first()
     if cp_map_db:
         cp_map = json.loads(cp_map_db.json_string)
     else:
@@ -292,10 +293,11 @@ def api():
                 # add info on containing curations
                 result['curations'] = []
                 can_uri_c, can_uri_x = doc.canvas_uri.split('#xywh=')
-                parent_ids = get_canvas_parents(can_uri_c, can_uri_x)
+                cp_map_db = CanvasParentMap.query.first()
+                parent_ids = get_canvas_parents(can_uri_c, can_uri_x, cp_map_db = cp_map_db)
                 curations_seen = []
                 for cur_id in parent_ids:
-                    pcurs_db = Curation.query.filter(Curation.curation_uri.ilike('%{}%'.format(cur_id))).all()
+                    pcurs_db = Curation.query.filter(Curation.curation_uri.ilike('{}%'.format(cur_id))).all()
                     for pcur_db in pcurs_db:
                         pcur_j = json.loads(pcur_db.json_string)
                         if pcur_j['curationUrl'] in curations_seen:
@@ -413,11 +415,9 @@ def parents():
     """
 
     ret = OrderedDict()
-    ret['canvas'] = None,
-    ret['xywh'] = None,
-    canvas = request.args.get('canvas', None)
-    xywh = request.args.get('xywh', None)
-    ret['parents'] = get_canvas_parents(canvas, xywh)
+    ret['canvas'] = request.args.get('canvas', None)
+    ret['xywh'] = request.args.get('xywh', None)
+    ret['parents'] = get_canvas_parents(ret['canvas'], ret['xywh'])
 
     resp = Response(json.dumps(ret, indent=4))
     resp.headers['Content-Type'] = 'application/json'
