@@ -31,7 +31,7 @@ api | server\_url | http://localhost:5005 | URL under which Canvas Indexer can b
 &zwnj; | facet\_label\_sort\_bottom | [] | comma seperated list defining the end of the list returned for the `/facets` endpoint
 &zwnj; | facet\_value\_sort\_frequency | [] | comma seperated list of facets to be sorted by frequency
 &zwnj; | facet\_value\_sort\_alphanum | [] | comma seperated list of facets to be sorted alphanumerically
-&zwnj; | facet\_value\_hide | [] | comma seperated list of facets labels to hide from API output
+&zwnj; | facet\_label\_hide | [] | comma seperated list of facets labels to hide from API output
 facet\_value\_sort\_<br>custom\_&lt;name&gt; | label | &zwnj; | facet label for which a custom order is defined
 &zwnj; | sort\_top | &zwnj; | comma seperated list defining the beginning
 &zwnj; | sort\_bottom | &zwnj; | comma seperated list defining the end
