@@ -82,6 +82,12 @@ def facets():
     else:
         facet_list = {'facets': []}
 
+    # remove hidden metadata labels
+    to_hide = current_app.cfg.facet_label_hide()
+    facet_list['facets'] = [
+        f for f in facet_list ['facets']if f['label'] not in to_hide
+    ]
+
     resp = Response(json.dumps(facet_list, indent=4))
     resp.headers['Content-Type'] = 'application/json'
     return resp
