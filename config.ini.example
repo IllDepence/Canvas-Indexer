@@ -10,6 +10,7 @@ facet_label_sort_top = テーマ,性別,向き,制作年,所蔵,原典,原典ID
 facet_label_sort_bottom = tag
 facet_value_sort_frequency = テーマ,性別,身分,向き,所蔵,原典
 facet_value_sort_alphanum = 制作年,原典ID
+facet_label_hide = 内部識別子,本音
 server_url = http://localhost:5005
 bot_urls = http://localhost:5010
 [facet_value_sort_custom_1]

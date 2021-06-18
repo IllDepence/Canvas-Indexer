@@ -105,6 +105,12 @@ def facets():
     else:
         facet_list = {'facets': []}
 
+    # remove hidden metadata labels
+    to_hide = current_app.cfg.facet_label_hide()
+    facet_list['facets'] = [
+        f for f in facet_list ['facets']if f['label'] not in to_hide
+    ]
+
     resp = Response(json.dumps(facet_list, indent=4))
     resp.headers['Content-Type'] = 'application/json'
     return resp
@@ -188,6 +194,10 @@ def api():
     docs = Doc.query
     assocs = Assoc.query
     terms = Term.query.filter(not_(Term.term == current_app.cfg.e_term()))
+
+    # prevent hidden metadata labels from yielding search results
+    for hidden_term in current_app.cfg.facet_label_hide():
+        terms = terms.filter(not_(Term.qualifier == hidden_term))
 
     if vrom not in ['curation,canvas', 'canvas,curation']:
         assocs = assocs.filter(Assoc.metadata_type == vrom)
@@ -323,6 +333,13 @@ def api():
         ret['limit'] = None
 
     ret['results'] = results
+
+    # filter out hidden metadata labels
+    for i, _ in enumerate(results):
+        results[i]['metadata'] = [
+            m for m in results[i]['metadata']
+            if m['label'] not in current_app.cfg.facet_label_hide()
+            ]
 
     # retroactively transform canvas response to Curation JSON
     # if output=cutaion

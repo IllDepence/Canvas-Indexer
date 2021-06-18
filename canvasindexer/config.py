@@ -42,6 +42,9 @@ class Cfg():
     def facet_label_sort_bottom(self):
         return self.cfg['facet_label_sort_bottom']
 
+    def facet_label_hide(self):
+        return self.cfg['facet_label_hide']
+
     def facet_value_sort_frequency(self):
         return self.cfg['facet_value_sort_frequency']
 
@@ -79,6 +82,7 @@ class Cfg():
         cfg['bot_urls'] = []
         cfg['facet_label_sort_top'] = []
         cfg['facet_label_sort_bottom'] = []
+        cfg['facet_label_hide'] = []
         cfg['facet_value_sort_frequency'] = []
         cfg['facet_value_sort_alphanum'] = []
         cfg['custom_value_sorts'] = {}
@@ -124,12 +128,16 @@ class Cfg():
                 cfg['bot_urls'] = [u.strip() for u in val.split(',') if len(u) > 0]
             sort_options = ['facet_label_sort_top',
                             'facet_label_sort_bottom',
+                            'facet_label_sort_bottom',
                             'facet_value_sort_frequency',
                             'facet_value_sort_alphanum']
             for so in sort_options:
                 if cp['api'].get(so):
                     val = cp['api'].get(so)
                     cfg[so] = [o.strip() for o in val.split(',') if len(o) > 0]
+            if cp['api'].get('facet_label_hide'):
+                val = cp['api'].get('facet_label_hide')
+                cfg['facet_label_hide'] = [h.strip() for h in val.split(',') if len(h) > 0]
         for sec_name in cp.sections():
             if 'facet_value_sort_custom_' in sec_name:
                 custom_sort = {}
