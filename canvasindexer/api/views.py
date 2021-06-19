@@ -336,10 +336,11 @@ def api():
 
     # filter out hidden metadata labels
     for i, _ in enumerate(results):
-        results[i]['metadata'] = [
-            m for m in results[i]['metadata']
-            if m['label'] not in current_app.cfg.facet_label_hide()
-            ]
+        if 'metadata' in results[i]:
+            results[i]['metadata'] = [
+                m for m in results[i]['metadata']
+                if m['label'] not in current_app.cfg.facet_label_hide()
+                ]
 
     # retroactively transform canvas response to Curation JSON
     # if output=cutaion
