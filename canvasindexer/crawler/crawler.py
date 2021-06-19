@@ -205,6 +205,8 @@ def get_referenced(json_dict, attrib):
 
     try:
         resp = requests_retry_session().get(url)
+        if resp.status_code != 200:
+            raise
     except Exception as e:
         log('Could not dereference resource at {}. Error {}.'.format(
             url,
@@ -746,6 +748,9 @@ def process_curation_create(lo, cp_map, activity):
     for ran in cur_dict.get('selections', []):
         # Manifest is the same for all Canvases ahead, so get it now
         man = get_referenced(ran, 'within')
+        if man == '{}':
+            # if the manifest can not be accessed, skip this range
+            continue
         todo = len(ran.get('members', []) + ran.get('canvases', []))
         log('processing {} canvases'.format(todo))
 
