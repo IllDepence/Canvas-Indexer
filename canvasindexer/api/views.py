@@ -347,8 +347,13 @@ def api():
     output_param = request.args.get('output', '')
     if output_param == 'curation' and select == 'canvas':
         # build curation
+        url_param_part = request.url.split(request.path)[-1]
         cur = CurationObj(
-            request.url,
+            '{}{}{}'.format(
+                current_app.cfg.serv_url(),
+                url_for('pd.api'),
+                url_param_part
+            ),
             'Canvas Indexer search result')
         for i, res in enumerate(results):
             can = cur.create_canvas(
