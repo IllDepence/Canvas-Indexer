@@ -38,7 +38,7 @@ def get_canvas_parents(canvas, xywh, cp_map_db = None):
         cp_map = json.loads(cp_map_db.json_string)
     else:
         cp_map = {'upward':{}, 'downward':{}}
-    if xywh:
+    if xywh and len(xywh) > 0:
         needle = '{}#xywh={}'.format(canvas, xywh)
         haystack = cp_map['upward']
     else:
@@ -302,7 +302,14 @@ def api():
                                     object_pairs_hook=OrderedDict)
                 # add info on containing curations
                 result['curations'] = []
-                can_uri_c, can_uri_x = doc.canvas_uri.split('#xywh=')
+                can_uri_parts = doc.canvas_uri.split('#xywh=')
+                if len(can_uri_parts) > 1:
+                    can_uri_c = can_uri_parts[0]
+                    can_uri_x = can_uri_parts[1]
+                else:
+                    # no #xywh contained
+                    can_uri_c = can_uri_parts
+                    can_uri_x = ''
                 cp_map_db = CanvasParentMap.query.first()
                 parent_ids = get_canvas_parents(can_uri_c, can_uri_x, cp_map_db = cp_map_db)
                 curations_seen = []
