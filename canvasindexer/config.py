@@ -57,6 +57,9 @@ class Cfg():
     def serv_url(self):
         return self.cfg['server_url']
 
+    def api_path(self):
+        return self.cfg['api_path']
+
     def bot_urls(self):
         return self.cfg['bot_urls']
 
@@ -79,6 +82,7 @@ class Cfg():
         cfg['crawler_log_file'] = '/tmp/ci_crawl_log.txt'
         cfg['allow_orphan_canvases'] = False
         cfg['server_url'] = 'http://localhost:5005'
+        cfg['api_path'] = 'api'
         cfg['bot_urls'] = []
         cfg['facet_label_sort_top'] = []
         cfg['facet_label_sort_bottom'] = []
@@ -123,6 +127,8 @@ class Cfg():
         if 'api' in cp.sections():
             if cp['api'].get('server_url'):
                 cfg['server_url'] = cp['api'].get('server_url')
+            if cp['api'].get('api_path'):
+                cfg['api_path'] = cp['api'].get('api_path')
             if cp['api'].get('bot_urls'):
                 val = cp['api'].get('bot_urls')
                 cfg['bot_urls'] = [u.strip() for u in val.split(',') if len(u) > 0]

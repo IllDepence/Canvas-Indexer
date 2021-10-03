@@ -116,7 +116,7 @@ def facets():
     return resp
 
 
-@pd.route('/api', methods=['GET'])
+@pd.route('/{}'.format(current_app.cfg.api_path()), methods=['GET'])
 def api():
     """ Search API.
     """

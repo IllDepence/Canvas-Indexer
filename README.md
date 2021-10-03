@@ -25,7 +25,8 @@ crawler | as\_sources | [] | comma seperated list of links to [Activity Streams]
 &zwnj; | interval | 3600 | crawl interval in seconds (value <=0 deactivates automatic crawling)
 &zwnj; | log\_file | /tmp/ci\_crawl\_log.txt | file system path to where the crawling details should be logged
 &zwnj; | allow\_orphan\_canvases | false | set whether or not Canvases, that are not associated with any parent elements in the index anymore, should still appear in search results
-api | server\_url | http://localhost:5005 | URL under which Canvas Indexer can be accessed (only needed when using bots ([details below](#bot-integration)))
+api | server\_url | http://localhost:5005 | URL under which Canvas Indexer can be accessed (used to set the `@id` attribute of curation format search results ([see API section](#api)) and when using tagging bots ([see bot intergration section](#bot-integration)))
+&zwnj; | api\_path | api | specifies the endpoint for API access<br>(e.g. `search` →  `http://indexcanvases.com/search` or `http://sirtetris.com/canvasindexer/search`)
 &zwnj; | bot\_urls | [] | comma seperated list of URLs to bots (only needed when using bots ([details below](#bot-integration)))
 &zwnj; | facet\_label\_sort\_top | [] | comma seperated list defining the beginning of the list returned for the `/facets` endpoint
 &zwnj; | facet\_label\_sort\_bottom | [] | comma seperated list defining the end of the list returned for the `/facets` endpoint
@@ -55,7 +56,7 @@ facet\_value\_sort\_<br>custom\_&lt;name&gt; | label | &zwnj; | facet label for 
 
 ## API
 
-**path: `{base_url}/api`**  
+**path: `{base_url}/api` / `{base_url}/{api_path}`**  
 arguments:
 
 arg | default | explanation
