@@ -346,7 +346,7 @@ def api():
         if 'metadata' in results[i]:
             results[i]['metadata'] = [
                 m for m in results[i]['metadata']
-                if m['label'] not in current_app.cfg.facet_label_hide()
+                if m.get('label') not in current_app.cfg.facet_label_hide()
                 ]
 
     # retroactively transform canvas response to Curation JSON
