@@ -363,8 +363,12 @@ def api():
             ),
             'Canvas Indexer search result')
         for i, res in enumerate(results):
+            if len(res['fragment']) == 0:
+                can_uri = res['canvasId']
+            else:
+                can_uri = '{}#{}'.format(res['canvasId'], res['fragment'])
             can = cur.create_canvas(
-                '{}#{}'.format(res['canvasId'], res['fragment']),
+                can_uri,
                 label = res['canvasLabel']
             )
             can['metadata'] = res['metadata']

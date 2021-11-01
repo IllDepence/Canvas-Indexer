@@ -564,6 +564,7 @@ def index_canvases_in_cur_selection(lo,
         log('canvas #{}'.format(cur_can_idx))
         # TODO: mby get read and include man[_can] metadata
         can_doc = build_canvas_doc(man, cur_can_dict)
+        # ↓ canvas URIs w/o fragment end with a "#"
         can_uri = '{}#{}'.format(can_doc['canvasId'], can_doc['fragment'])
         can_cur_doc = build_curation_doc(cur, activity, can_doc,
                                      cur_can_idx)
