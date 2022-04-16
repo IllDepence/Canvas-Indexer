@@ -905,7 +905,12 @@ def crawl_single(lo, cp_map, as_source):
     #       for a document for which a Delete was processed just before.)
     seen_activity_objs = []
     # for all AS pages
+    loop_counter = 0
     while True:
+        # HOTFIX: break out of possible inifine loop by skipping one AS page
+        if loop_counter > 10000:
+            loop_counter = 0  # reset counter
+            continue          # skip single AS page
         # for all AC items
         log('going through AS page {}'.format(as_ocp['id']))
         for activity in as_ocp['orderedItems']:
@@ -940,6 +945,7 @@ def crawl_single(lo, cp_map, as_source):
         if not as_ocp.get('prev', False):
             break
         as_ocp = get_referenced(as_ocp, 'prev')
+        loop_counter += 1
 
     # persist crawl log
     crawl_log = CrawlLog(new_canvases=new_canvases,
