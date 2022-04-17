@@ -922,24 +922,39 @@ def crawl_single(lo, cp_map, as_source):
                     activity['object']['@type'] == 'cr:Curation' and \
                     activity['object'] not in seen_activity_objs:
                 new_activity = True
+                log('##### found a new activity')
                 if activity['type'] == 'Create':
+                    log('##### processing new Curation create activity ...')
                     new_canvases += process_curation_create(lo, cp_map,
                                                             activity)
+                    log('##### processing done.')
                 elif activity['type'] == 'Update':
+                    log('##### processing new Curation update activity ...')
+                    log('##### deleting old ...')
                     process_curation_delete(cp_map, activity)
+                    log('##### deleting done ...')
                     lo = get_lookup_dict()
+                    log('##### creating updated ...')
                     process_curation_create(lo, cp_map, activity)
+                    log('##### creating done ...')
+                    log('##### processing done.')
                     # TODO: possible to determine new canvases?
                 elif activity['type'] == 'Delete':
+                    log('##### processing new Curation delete activity ...')
                     process_curation_delete(cp_map, activity)
+                    log('##### processing done.')
+                log('##### committing changes to database ...')
                 db.session.commit()
+                log('##### committing done.')
                 seen_activity_objs.append(activity['object'])
             else:
                 log('skipping')
 
         if not as_ocp.get('prev', False):
+            log('reached oldest entry in activity stream.')
             break
         as_ocp = get_referenced(as_ocp, 'prev')
+    log('finished iterating over Activity Stream pages')
 
     # persist crawl log
     crawl_log = CrawlLog(new_canvases=new_canvases,
